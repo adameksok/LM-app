@@ -182,8 +182,8 @@ def render_dashboard():
 
     st.markdown("""
         <div class="dash-header">
-            <div class="label">Twoje modele</div>
-            <h2>Biblioteka Analityczna</h2>
+            <div class="label">Your Models</div>
+            <h2>Analytical Library</h2>
         </div>
     """, unsafe_allow_html=True)
 
@@ -236,10 +236,22 @@ def _render_tile(plugin_id: str, config: PluginConfig):
     """
     st.markdown(card_html, unsafe_allow_html=True)
 
-    if st.button("Otwórz →", key=f"btn_{plugin_id}", use_container_width=True):
-        st.session_state.current_view = "experiment"
-        st.session_state.current_model_id = plugin_id
-        st.rerun()
+    bcol1, bcol2 = st.columns([3, 1])
+    with bcol1:
+        if st.button("Open →", key=f"btn_{plugin_id}", use_container_width=True):
+            st.session_state.current_view = "experiment"
+            st.session_state.current_model_id = plugin_id
+            st.rerun()
+    with bcol2:
+        if st.button("🗑️", key=f"del_{plugin_id}", help="Disconnect plugin", use_container_width=True):
+            plugin_file = MODELS_DIR / f"{plugin_id}.py"
+            try:
+                if plugin_file.exists():
+                    plugin_file.unlink()
+                st.cache_resource.clear()
+                st.rerun()
+            except Exception as e:
+                st.error(f"Cannot delete: {e}")
 
 
 def _render_add_tile():
@@ -248,8 +260,8 @@ def _render_add_tile():
     add_html = """
     <div class="add-card">
         <div class="add-icon">＋</div>
-        <div class="add-title">Dodaj Model</div>
-        <div class="add-subtitle">Wgraj plik .py</div>
+        <div class="add-title">Add Model</div>
+        <div class="add-subtitle">Upload .py file</div>
     </div>
     """
     st.markdown(add_html, unsafe_allow_html=True)

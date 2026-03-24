@@ -62,9 +62,6 @@ PARAMETRY UKRYTE (techniczne, nieistotne dla nauki)
 @param: n_jobs
 @show: false
 
-@param: tol
-@show: false
-
 ================================================================================
 INFORMACJE DYDAKTYCZNE
 ================================================================================
