@@ -99,6 +99,12 @@ section[data-testid="stSidebar"] {
     font-size: 10px; font-weight: 700; padding: 2px 8px;
     border-radius: 4px; display: inline-block;
 }
+
+/* ── White Widget Backgrounds ── */
+div[data-testid="stVerticalBlockBorderWrapper"],
+div[data-testid="stExpander"] {
+    background-color: #ffffff;
+}
 </style>
 """
 
@@ -110,6 +116,9 @@ def main():
         render_dashboard()
     elif st.session_state.current_view == "experiment":
         render_experiment_view()
+    elif st.session_state.current_view == "saved_model":
+        from components.saved_model_view import render_saved_model_view
+        render_saved_model_view()
 
 
 def _render_sidebar_nav(meta):
@@ -186,10 +195,18 @@ def _render_param_controls(parameters: List[ParameterConfig]) -> Dict[str, Any]:
         elif param.type == "select":
             options = param.options or []
             default_idx = options.index(param.default) if param.default in options else 0
+            
+            def format_func(x, p=param):
+                opt_labels = getattr(p, 'option_labels', None)
+                if opt_labels and x in opt_labels:
+                    return opt_labels[x]
+                return str(x)
+                
             params[param.name] = st.selectbox(
                 label=param.label,
                 options=options,
                 index=default_idx,
+                format_func=format_func,
                 help=param.hint
             )
 
@@ -292,6 +309,16 @@ def render_experiment_view():
     engine = get_plugin_engine()
     config = engine.get_plugin(st.session_state.current_model_id)
 
+    # Flush session state to prevent contamination when switching models
+    if st.session_state.get("_last_experiment_model_id") != st.session_state.current_model_id:
+        st.session_state["_last_experiment_model_id"] = st.session_state.current_model_id
+        st.session_state["model_ran"] = False
+        keys_to_clear = ["last_run_X", "last_run_y", "last_run_params", "last_run_features", "last_run_target",
+                         "current_X", "current_y", "current_features", "current_target"]
+        for k in keys_to_clear:
+            if k in st.session_state:
+                del st.session_state[k]
+
     if not config:
         st.error("❌ Plugin not found!")
         if st.button("← Back to Dashboard"):
@@ -321,6 +348,22 @@ def render_experiment_view():
 
         # ── TWO-COLUMN LAYOUT: 1/3 controls, 2/3 results ──
         col_ctrl, col_results = st.columns([1, 2], gap="large")
+
+        # Prep variables for both columns
+        run_X = st.session_state.get("last_run_X")
+        run_y = st.session_state.get("last_run_y")
+        run_params = st.session_state.get("last_run_params", {})
+        run_features = st.session_state.get("last_run_features", [])
+
+        from components.visualization import (
+            fit_model_instance, render_results_panel, render_empty_results_panel,
+            render_model_attributes_card, render_model_attributes_skeleton,
+            render_side_visualizations, render_side_visualizations_skeleton
+        )
+        
+        # Ensure model is fitted before rendering either column for consistency
+        if st.session_state.get("model_ran", False) and run_X is not None:
+             fit_model_instance(config, config.model_instance, run_X, run_y, run_params)
 
         # ==============================================================
         # LEFT COLUMN — Control Panel
@@ -364,10 +407,74 @@ def render_experiment_view():
             # ── Load Data ──
             with st.container(border=True):
                 st.markdown("**📁 Load Data**")
-                X, y, feature_names = _render_data_card(meta)
+                raw_df, source_type = _render_data_card(meta)
+                
+            # ── Data Preparation ──
+            X, y, feature_names = None, None, []
+            system_msgs = []
+            current_target = "Target"
+            
+            if raw_df is not None:
+                if source_type == "csv":
+                    from components.data_prep_ui import render_preprocessing_card
+                    clean_df, target_col, prep_msgs = render_preprocessing_card(raw_df, meta.task)
+                    system_msgs.extend(prep_msgs)
+                    
+                    if not clean_df.empty:
+                        if target_col and target_col in clean_df.columns:
+                            y = clean_df[target_col].values
+                            feat_df = clean_df.drop(columns=[target_col])
+                            current_target = target_col
+                        else:
+                            y = None
+                            feat_df = clean_df
+                            
+                        X = feat_df.values
+                        feature_names = feat_df.columns.tolist()
+                else:
+                    # Synthetic datasets are already preprocessed
+                    cols_to_drop = []
+                    if 'Target' in raw_df.columns and meta.task in ("classification", "regression"):
+                        y = raw_df['Target'].values
+                        cols_to_drop.append('Target')
+                        current_target = 'Target'
+                    else:
+                        y = None
+                        
+                    if '_IsOutlier' in raw_df.columns:
+                        st.session_state["current_outliers"] = raw_df['_IsOutlier'].values
+                        cols_to_drop.append('_IsOutlier')
+                    else:
+                        st.session_state["current_outliers"] = None
+                        
+                    feat_df = raw_df.drop(columns=cols_to_drop)
+                    X = feat_df.values
+                    feature_names = feat_df.columns.tolist()
+
+                if X is not None:
+                    if meta.task == "regression" and X.shape[1] > 1:
+                        system_msgs.append("Wielowymiarowa regresja: Do wizualizacji wyników użyto widoku 'Rzeczywiste vs Przewidywane' oraz redukcji wymiarów.")
+                    elif meta.task == "classification" and X.shape[1] > 2:
+                        system_msgs.append("Problem wielowymiarowy: Aplikacja automatycznie użyła analizy główych składowych (PCA), aby wyświetlić podgląd danych w 2D.")
+
                 st.session_state["current_X"] = X
                 st.session_state["current_y"] = y
                 st.session_state["current_features"] = feature_names
+                st.session_state["current_target"] = current_target
+
+            # ── System Messages Inbox ──
+            if system_msgs:
+                with st.expander(f"✉️ Komunikaty systemu ({len(system_msgs)})", expanded=False):
+                    for msg in system_msgs:
+                        st.info(f"{msg}")
+
+            # ── Model Attributes & Sidebar Visualizations (Left Column) ──
+            if st.session_state.get("model_ran", False):
+                render_model_attributes_card(config, config.model_instance, run_features)
+                render_side_visualizations(config, config.model_instance, run_X, run_y, meta.task, run_features)
+            else:
+                render_model_attributes_skeleton(config)
+                render_side_visualizations_skeleton(config, X_available=(X is not None))
 
             # ── Populate Run Model Button ──
             # Executed after params and data are resolved, so no state lagging
@@ -385,6 +492,7 @@ def render_experiment_view():
                     st.session_state["last_run_X"] = X
                     st.session_state["last_run_y"] = y
                     st.session_state["last_run_features"] = feature_names
+                    st.session_state["last_run_target"] = current_target
                     st.rerun()
 
         # ==============================================================
@@ -392,13 +500,26 @@ def render_experiment_view():
         # ==============================================================
         with col_results:
             if st.session_state.get("model_ran", False):
-                run_X = st.session_state.get("last_run_X")
-                run_y = st.session_state.get("last_run_y")
-                run_params = st.session_state.get("last_run_params", {})
-                run_features = st.session_state.get("last_run_features", [])
-
                 if run_X is not None:
-                    st.markdown("### 📊 Wyniki")
+                    r_col1, r_col2 = st.columns([3, 1])
+                    with r_col1:
+                        st.markdown("### 📊 Wyniki")
+                    with r_col2:
+                        if st.button("💾 Zapisz Model", use_container_width=True):
+                            from core.model_storage import save_model
+                            try:
+                                save_model(
+                                    name=meta.name,
+                                    plugin_id=st.session_state.current_model_id,
+                                    task=meta.task,
+                                    model_instance=config.model_instance,
+                                    feature_names=run_features,
+                                    target_name=st.session_state.get("last_run_target", "Target"),
+                                    user_params=run_params
+                                )
+                                st.toast("✅ Model został zapisany pomyślnie!")
+                            except Exception as e:
+                                st.error(f"Nie udało się zapisać modelu: {e}")
                     try:
                         render_results_panel(config, config.model_instance, run_X, run_y, run_params, run_features)
                     except Exception as e:
@@ -452,12 +573,13 @@ def _render_ai_suggestion(meta):
 
 
 def _render_data_card(meta):
-    """Renders the Load Data card. Returns (X, y, feature_names)."""
+    """Renders the Load Data card. Returns (raw_df, source_type)."""
     
     def _reset_model_ran():
         st.session_state["model_ran"] = False
 
-    X, y, feature_names = None, None, []
+    raw_df = None
+    source_type = None
 
     # Source selector
     csv_selected = st.radio(
@@ -470,6 +592,7 @@ def _render_data_card(meta):
     )
 
     if csv_selected == "📄 Upload CSV file":
+        source_type = "csv"
         # Dropzone visual
         st.markdown("""
         <div class="data-dropzone">
@@ -484,26 +607,15 @@ def _render_data_card(meta):
         if uploaded:
             ext = uploaded.name.split(".")[-1].lower()
             if ext == "csv":
-                df = pd.read_csv(uploaded)
+                raw_df = pd.read_csv(uploaded)
             elif ext in ("xlsx", "xls"):
-                df = pd.read_excel(uploaded)
+                raw_df = pd.read_excel(uploaded)
             elif ext == "json":
-                df = pd.read_json(uploaded)
+                raw_df = pd.read_json(uploaded)
             else:
-                df = pd.read_csv(uploaded)
+                raw_df = pd.read_csv(uploaded)
 
-            st.dataframe(df, use_container_width=True, height=280)
-            cols_list = list(df.columns)
-            if meta.task in ("classification", "regression"):
-                target_col = st.selectbox("Kolumna docelowa (y):", cols_list, index=len(cols_list) - 1)
-                feature_cols = [c for c in cols_list if c != target_col]
-                X = df[feature_cols].values
-                y = df[target_col].values
-                feature_names = feature_cols
-            else:
-                X = df.values
-                y = None
-                feature_names = cols_list
+            st.dataframe(raw_df, use_container_width=True, height=280)
 
         # Format tags
         st.markdown(
@@ -516,6 +628,7 @@ def _render_data_card(meta):
         )
 
     elif csv_selected == "🧪 Use sample dataset":
+        source_type = "sample"
         from core.data_generators import generate_dataset
 
         dataset_map = {
@@ -558,7 +671,7 @@ def _render_data_card(meta):
         if st.button("🎲 Losuj nowe punkty", use_container_width=True, on_click=_reset_model_ran):
             st.session_state.data_seed += 1
 
-        X, y = generate_dataset(
+        X, y, is_outlier = generate_dataset(
             dataset_type=dataset_type, 
             n_samples=n_samples, 
             noise=noise,
@@ -571,12 +684,16 @@ def _render_data_card(meta):
             X = X.reshape(-1, 1)
         feature_names = [f"X{i+1}" for i in range(X.shape[1])]
 
-        sample_df = pd.DataFrame(X, columns=feature_names)
+        raw_df = pd.DataFrame(X, columns=feature_names)
         if y is not None:
-            sample_df["Target"] = y
-        st.dataframe(sample_df, use_container_width=True, height=280)
+            raw_df["Target"] = y
+        if np.any(is_outlier):
+            raw_df["_IsOutlier"] = is_outlier
 
-    return X, y, feature_names
+        st.dataframe(raw_df.drop(columns=["_IsOutlier"], errors="ignore"), use_container_width=True, height=280)
+
+    return raw_df, source_type
+
 
 
 if __name__ == "__main__":

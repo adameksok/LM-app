@@ -12,7 +12,8 @@ class ParameterConfig:
     max_val: Optional[float] = None
     step: Optional[Any] = None
     default: Any = None
-    options: Optional[List[str]] = None
+    options: Optional[List[Any]] = None
+    option_labels: Optional[Dict[Any, str]] = None
     hint: str = ""
     show: bool = True
 

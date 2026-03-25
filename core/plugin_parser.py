@@ -18,11 +18,11 @@ from core.plugin_interface import (
 # =========================================================================
 
 def _extract_docstring(content: str) -> Tuple[str, str]:
-    pattern = r'"""(.*?)"""'
+    pattern = r'(\"\"\"|\'\'\')(.*?)\1'
     match = re.search(pattern, content, re.DOTALL)
     if not match:
         return "", content
-    return match.group(1).strip(), content[match.end():].strip()
+    return match.group(2).strip(), content[match.end():].strip()
 
 
 # =========================================================================
@@ -203,10 +203,35 @@ def _build_parameters(param_blocks, sklearn_params):
             result.append(ParameterConfig(name=param_name, label=label, type="bool",
                                           default=default, hint=hint, show=True))
         elif param_type == "select":
-            options = [o.strip() for o in user_block.get("options", "").split(",")]
-            default = user_block.get("default", str(default_val))
+            def _parse_val(v):
+                v = v.strip()
+                if v.lower() == 'none': return None
+                if v.lower() == 'true': return True
+                if v.lower() == 'false': return False
+                try: return int(v)
+                except ValueError: pass
+                try: return float(v)
+                except ValueError: pass
+                return v
+
+            raw_options = [o.strip() for o in user_block.get("options", "").split(",")]
+            options = []
+            option_labels = {}
+            for o in raw_options:
+                if ":" in o:
+                    lbl, val = o.split(":", 1)
+                    parsed_val = _parse_val(val)
+                    options.append(parsed_val)
+                    option_labels[parsed_val] = lbl.strip()
+                else:
+                    parsed_val = _parse_val(o)
+                    options.append(parsed_val)
+                    option_labels[parsed_val] = str(parsed_val)
+                    
+            default_str = user_block.get("default", str(default_val))
+            default = _parse_val(default_str)
             result.append(ParameterConfig(name=param_name, label=label, type="select",
-                                          options=options, default=default, hint=hint, show=True))
+                                          options=options, option_labels=option_labels, default=default, hint=hint, show=True))
     return result
 
 

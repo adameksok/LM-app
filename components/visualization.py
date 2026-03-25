@@ -55,26 +55,32 @@ def render_data_preview(task: str, X: np.ndarray, y: Optional[np.ndarray], featu
         st.info("Podgląd wizualny dostępny po uruchomieniu modelu dla tego zadania.")
         return
 
-    st.plotly_chart(fig, use_container_width=True)
+    with st.container(border=True):
+        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key="data_preview")
+
+
+def fit_model_instance(config: PluginConfig, model, X, y, params):
+    """Applies parameters and fits the model based on task type."""
+    task = config.metadata.task
+    try:
+        if params:
+            model.set_params(**params)
+    except Exception:
+        pass
+
+    if task in ("dimensionality_reduction", "clustering"):
+        model.fit(X)
+    else:
+        model.fit(X, y)
 
 
 def render_results_panel(config: PluginConfig, model, X, y, params, feature_names):
     """Main entry — renders the full results panel after model.fit()."""
-
     task = config.metadata.task
-
-    # Apply params and fit model
-    try:
-        model.set_params(**params)
-    except Exception:
-        pass
-
-    if task == "dimensionality_reduction":
-        model.fit(X)
-    elif task == "clustering":
-        model.fit(X)
-    else:
-        model.fit(X, y)
+    
+    # Model should be fitted by fit_model_instance before this call for efficiency,
+    # but we ensure it here as well for backwards compatibility.
+    fit_model_instance(config, model, X, y, params)
         
     # --- MAIN VISUALIZATIONS ---
     visible_vizs = [v for v in config.visualizations if v.show]
@@ -84,12 +90,6 @@ def render_results_panel(config: PluginConfig, model, X, y, params, feature_name
 
     for viz in main_vizs:
         _render_viz(viz, model, X, y, task, feature_names)
-
-    if side_vizs:
-        cols = st.columns(len(side_vizs))
-        for col, viz in zip(cols, side_vizs):
-            with col:
-                _render_viz(viz, model, X, y, task, feature_names)
 
     # --- EQUATION ---
     eq_vizs = [v for v in visible_vizs if v.name == "equation" and v.position == "top"]
@@ -101,12 +101,14 @@ def render_results_panel(config: PluginConfig, model, X, y, params, feature_name
                 st.latex(equation.replace("·", r" \cdot ").replace("ŷ", r"\hat{y}"))
 
     # --- METRICS ---
+    # Metrics now full width under equation
     metrics = calculate_metrics(model, X, y, task, config)
     if metrics:
         with st.container(border=True):
             st.markdown("**📈 Metryki jakości**")
-            cols = st.columns(len(metrics))
-            for col, (mid, mdata) in zip(cols, metrics.items()):
+            m_cols = st.columns(len(metrics))
+            for i, (mid, mdata) in enumerate(metrics.items()):
+                col = m_cols[i]
                 value = mdata['value']
                 label = mdata['label']
                 fmt = mdata['format']
@@ -124,18 +126,11 @@ def render_results_panel(config: PluginConfig, model, X, y, params, feature_name
                     delta = f"{'✅ good' if value >= good else '⚠️ low'}"
 
                 col.metric(label=label, value=display_val, delta=delta)
-
                 if mdata.get('hint'):
                     col.caption(mdata['hint'][:100])
 
-    # --- MODEL ATTRIBUTES / OUTPUTS ---
-    outputs = get_model_outputs(model, feature_names, config)
-    if outputs:
-        st.markdown("#### 📊 Atrybuty modelu")
-        for attr_name, odata in outputs.items():
-            _render_output(attr_name, odata, feature_names)
-
     # --- BOTTOM VISUALIZATIONS ---
+    # Stacked vertically under metrics
     for viz in bottom_vizs:
         _render_viz(viz, model, X, y, task, feature_names)
 
@@ -150,58 +145,60 @@ def _render_output(attr_name: str, odata: Dict[str, Any], feature_names: List[st
     fmt = odata.get('format', 'text')
     hint = odata.get('hint', '')
 
-    with st.expander(f"📋 {label}", expanded=False):
-        if fmt == "text":
-            if isinstance(value, np.ndarray):
-                st.code(str(value))
-            else:
-                st.write(f"**{value}**")
-
-        elif fmt == "bar_chart":
-            if isinstance(value, np.ndarray) and value.ndim == 1:
-                names = feature_names[:len(value)] if len(feature_names) >= len(value) else [f"f{i}" for i in range(len(value))]
-                fig = go.Figure(go.Bar(x=names, y=value, marker_color=['#e74c3c' if v < 0 else '#3498db' for v in value]))
-                fig.update_layout(title=label, template='plotly_white', height=300)
-                st.plotly_chart(fig, use_container_width=True)
-            elif isinstance(value, np.ndarray) and value.ndim == 2:
-                fig = go.Figure(go.Bar(x=[f"f{i}" for i in range(value.shape[1])], y=value[0]))
-                fig.update_layout(title=label, template='plotly_white', height=300)
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.write(f"**{value}**")
-
-        elif fmt == "table":
-            if isinstance(value, np.ndarray):
-                if value.ndim == 2:
-                    df = pd.DataFrame(value, columns=feature_names[:value.shape[1]] if len(feature_names) >= value.shape[1] else None)
-                    st.dataframe(df, use_container_width=True)
-                else:
-                    st.dataframe(pd.DataFrame({'Value': value}), use_container_width=True)
-            else:
-                st.write(f"**{value}**")
-
-        elif fmt == "percentage_bar":
-            if isinstance(value, np.ndarray):
-                for i, v in enumerate(value):
-                    st.progress(float(v), text=f"PC{i+1}: {v:.1%}")
-            else:
-                st.progress(float(value), text=f"{value:.1%}")
-
-        elif fmt == "heatmap":
-            if isinstance(value, np.ndarray) and value.ndim == 2:
-                fig = px.imshow(value, text_auto=".2f", color_continuous_scale='RdBu_r')
-                fig.update_layout(title=label, height=300)
-                st.plotly_chart(fig, use_container_width=True)
-
-        elif fmt == "scatter_overlay":
-            st.caption(f"{len(value)} items")
-            st.code(str(value[:5]) + (" ..." if len(value) > 5 else ""))
-
+    st.markdown(f"**📋 {label}**")
+    if fmt == "text":
+        if isinstance(value, np.ndarray):
+            st.code(str(value))
         else:
             st.write(f"**{value}**")
 
-        if hint:
-            st.info(f"💡 {hint}")
+    elif fmt == "bar_chart":
+        if isinstance(value, np.ndarray) and value.ndim == 1:
+            names = feature_names[:len(value)] if len(feature_names) >= len(value) else [f"f{i}" for i in range(len(value))]
+            fig = go.Figure(go.Bar(x=names, y=value, marker_color=['#e74c3c' if v < 0 else '#3498db' for v in value]))
+            fig.update_layout(title="", template='plotly_white', height=250, margin=dict(t=20, b=20, l=20, r=20))
+            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key=f"out_bar_{attr_name}")
+        elif isinstance(value, np.ndarray) and value.ndim == 2:
+            fig = go.Figure(go.Bar(x=[f"f{i}" for i in range(value.shape[1])], y=value[0]))
+            fig.update_layout(title="", template='plotly_white', height=250, margin=dict(t=20, b=20, l=20, r=20))
+            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key=f"out_bar_2d_{attr_name}")
+        else:
+            st.write(f"**{value}**")
+
+    elif fmt == "table":
+        if isinstance(value, np.ndarray):
+            if value.ndim == 2:
+                df = pd.DataFrame(value, columns=feature_names[:value.shape[1]] if len(feature_names) >= value.shape[1] else None)
+                st.dataframe(df, use_container_width=True)
+            else:
+                st.dataframe(pd.DataFrame({'Value': value}), use_container_width=True)
+        else:
+            st.write(f"**{value}**")
+
+    elif fmt == "percentage_bar":
+        if isinstance(value, np.ndarray):
+            for i, v in enumerate(value):
+                st.progress(float(v), text=f"PC{i+1}: {v:.1%}")
+        else:
+            st.progress(float(value), text=f"{value:.1%}")
+
+    elif fmt == "heatmap":
+        if isinstance(value, np.ndarray) and value.ndim == 2:
+            fig = px.imshow(value, text_auto=".2f", color_continuous_scale='RdBu_r')
+            fig.update_layout(title="", height=250, margin=dict(t=20, b=20, l=20, r=20))
+            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key=f"out_heat_{attr_name}")
+
+    elif fmt == "scatter_overlay":
+        st.caption(f"{len(value)} items")
+        st.code(str(value[:5]) + (" ..." if len(value) > 5 else ""))
+
+    else:
+        st.write(f"**{value}**")
+
+    if hint:
+        st.info(f"💡 {hint}")
+
+    st.markdown("<hr style='margin:12px 0; border:none; border-top:1px solid #f0f0f0'>", unsafe_allow_html=True)
 
 
 # =========================================================================
@@ -226,13 +223,16 @@ def _render_viz(viz: VisualizationConfig, model, X, y, task, feature_names):
         "loadings_heatmap": _viz_loadings_heatmap,
         "class_distribution": _viz_class_distribution,
         "roc_curve": _viz_roc_curve,
+        "probability_distribution": _viz_probability_distribution,
+        "precision_recall_curve": _viz_precision_recall_curve,
         "support_vectors_overlay": _viz_support_vectors,
     }
 
     renderer = viz_map.get(viz.name)
     if renderer:
         try:
-            renderer(model, X, y, task, feature_names, viz)
+            with st.container(border=True):
+                renderer(model, X, y, task, feature_names, viz)
         except Exception as e:
             st.warning(f"⚠️ {viz.label}: {e}")
 
@@ -240,6 +240,10 @@ def _render_viz(viz: VisualizationConfig, model, X, y, task, feature_names):
 def _viz_decision_boundary(model, X, y, task, feature_names, viz):
     if X.shape[1] < 2:
         return
+    if X.shape[1] > 2:
+        st.info("💡 **Problem wyższych wymiarów:** Ponieważ używasz więcej niż 2 cech wejściowych, nie można wyrysować prostej granicy decyzyjnej w przestrzeni 2D. Pozostałe wielowymiarowe statystyki wygenerowano poprawnie poniżej.")
+        return
+        
     fig = go.Figure()
     x_min, x_max = X[:, 0].min() - 0.5, X[:, 0].max() + 0.5
     y_min, y_max = X[:, 1].min() - 0.5, X[:, 1].max() + 0.5
@@ -252,39 +256,78 @@ def _viz_decision_boundary(model, X, y, task, feature_names, viz):
         mask = y == cls
         fig.add_trace(go.Scatter(x=X[mask, 0], y=X[mask, 1], mode='markers', name=f'Class {cls}',
                                   marker=dict(size=8, line=dict(width=1, color='white'))))
-    fig.update_layout(title=viz.label, xaxis_title="X₁", yaxis_title="X₂", template='plotly_white')
-    st.plotly_chart(fig, use_container_width=True)
+    fig.update_layout(title=viz.label, xaxis_title=feature_names[0] if feature_names else "X₁", yaxis_title=feature_names[1] if len(feature_names)>1 else "X₂", template='plotly_white')
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key="viz_decision_boundary")
 
 
 def _viz_regression_fit(model, X, y, task, feature_names, viz):
-    """Scatter plot of data points + fitted regression line."""
-    X_flat = X.reshape(-1, 1) if X.ndim == 1 else X
-    y_pred = model.predict(X_flat)
-
-    fig = go.Figure()
-
-    # Data points
-    fig.add_trace(go.Scatter(
-        x=X_flat[:, 0], y=y, mode='markers', name='Dane',
-        marker=dict(size=8, color='#3498db', opacity=0.7)
-    ))
-
-    # Fitted line (sorted for smooth line)
-    x_sorted = np.sort(X_flat[:, 0])
-    y_line = model.predict(x_sorted.reshape(-1, 1))
-    fig.add_trace(go.Scatter(
-        x=x_sorted, y=y_line, mode='lines', name='Dopasowanie',
-        line=dict(color='#e74c3c', width=3)
-    ))
-
-    fig.update_layout(
-        title=viz.label,
-        xaxis_title=feature_names[0] if feature_names else "X",
-        yaxis_title="y",
-        hovermode='closest',
-        template='plotly_white'
-    )
-    st.plotly_chart(fig, use_container_width=True)
+    """Scatter plot of data points + fitted regression line, OR Actual vs Predicted for >1 feature."""
+    outliers = st.session_state.get("current_outliers")
+    has_outliers = outliers is not None and len(outliers) == len(X)
+        
+    if X.shape[1] == 1:
+        X_flat = X.reshape(-1, 1)
+        fig = go.Figure()
+        
+        # Data points
+        if has_outliers:
+            fig.add_trace(go.Scatter(
+                x=X_flat[~outliers, 0], y=y[~outliers], mode='markers', name='Dane (Normalne)',
+                marker=dict(size=8, color='#3498db', opacity=0.7)
+            ))
+            fig.add_trace(go.Scatter(
+                x=X_flat[outliers, 0], y=y[outliers], mode='markers', name='Elementy Odstające',
+                marker=dict(size=10, color='#e74c3c', opacity=0.9, symbol='x')
+            ))
+        else:
+            fig.add_trace(go.Scatter(
+                x=X_flat[:, 0], y=y, mode='markers', name='Dane',
+                marker=dict(size=8, color='#3498db', opacity=0.7)
+            ))
+        
+        # Fitted line (sorted for smooth line)
+        x_min, x_max = X_flat.min(), X_flat.max()
+        x_line = np.linspace(x_min, x_max, 100).reshape(-1, 1)
+        y_line = model.predict(x_line)
+        fig.add_trace(go.Scatter(
+            x=x_line[:, 0], y=y_line, mode='lines', name='Dopasowanie',
+            line=dict(color='#e74c3c', width=3)
+        ))
+        
+        fig.update_layout(
+            title=viz.label,
+            xaxis_title=feature_names[0] if feature_names else "X",
+            yaxis_title="Cel (y)",
+            hovermode='closest',
+            template='plotly_white'
+        )
+    else:
+        # Multiple regression (N > 1) -> Actual vs Predicted
+        y_pred = model.predict(X)
+        fig = go.Figure()
+        
+        fig.add_trace(go.Scatter(
+            x=y, y=y_pred, mode='markers', name='Predykcje',
+            marker=dict(size=8, color='#3498db', opacity=0.7)
+        ))
+        
+        min_val = min(np.min(y), np.min(y_pred))
+        max_val = max(np.max(y), np.max(y_pred))
+        
+        fig.add_trace(go.Scatter(
+            x=[min_val, max_val], y=[min_val, max_val], mode='lines', name='Idealne dopasowanie',
+            line=dict(color='#e74c3c', width=2, dash='dash')
+        ))
+        
+        fig.update_layout(
+            title=f"{viz.label} (Wielowymiarowa): Rzeczywiste vs Przewidywane",
+            xaxis_title="Wartość Rzeczywista (y)",
+            yaxis_title="Wartość Przewidywana przez Model",
+            hovermode='closest',
+            template='plotly_white'
+        )
+        
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key="viz_regression_fit")
 
 
 def _viz_confusion_matrix(model, X, y, task, feature_names, viz):
@@ -294,7 +337,7 @@ def _viz_confusion_matrix(model, X, y, task, feature_names, viz):
     fig = px.imshow(cm, text_auto=True, x=[str(l) for l in labels], y=[str(l) for l in labels],
                     color_continuous_scale='Blues', labels=dict(x="Predicted", y="Actual"))
     fig.update_layout(title=viz.label, height=350)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key="viz_confusion_matrix")
 
 
 def _viz_coefficients_bar(model, X, y, task, feature_names, viz):
@@ -304,7 +347,7 @@ def _viz_coefficients_bar(model, X, y, task, feature_names, viz):
     fig = go.Figure(go.Bar(x=feature_names[:len(coef)], y=coef,
                            marker_color=['#e74c3c' if v < 0 else '#3498db' for v in coef]))
     fig.update_layout(title=viz.label, template='plotly_white', height=300)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key="viz_coefficients_bar")
 
 
 def _viz_coefficients_table(model, X, y, task, feature_names, viz):
@@ -322,7 +365,7 @@ def _viz_residuals(model, X, y, task, feature_names, viz):
     fig.add_trace(go.Scatter(x=y_pred, y=residuals, mode='markers', marker=dict(size=6, color='#3498db')))
     fig.add_hline(y=0, line_dash="dash", line_color="red")
     fig.update_layout(title=viz.label, xaxis_title="Predicted", yaxis_title="Residual", template='plotly_white')
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key="viz_residuals")
 
 
 def _viz_cluster_centers(model, X, y, task, feature_names, viz):
@@ -337,7 +380,7 @@ def _viz_cluster_centers(model, X, y, task, feature_names, viz):
         fig.add_trace(go.Scatter(x=c[:, 0], y=c[:, 1], mode='markers', name='Centroids',
                                   marker=dict(size=16, color='black', symbol='x')))
     fig.update_layout(title=viz.label, template='plotly_white')
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key="viz_cluster_centers")
 
 
 def _viz_variance_bar(model, X, y, task, feature_names, viz):
@@ -346,7 +389,7 @@ def _viz_variance_bar(model, X, y, task, feature_names, viz):
     evr = model.explained_variance_ratio_
     fig = go.Figure(go.Bar(x=[f"PC{i+1}" for i in range(len(evr))], y=evr, marker_color='#3498db'))
     fig.update_layout(title=viz.label, yaxis_title="Variance Ratio", template='plotly_white', height=300)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key="viz_variance_bar")
 
 
 def _viz_cumulative_variance(model, X, y, task, feature_names, viz):
@@ -358,7 +401,7 @@ def _viz_cumulative_variance(model, X, y, task, feature_names, viz):
                                 marker=dict(size=8, color='#e74c3c')))
     fig.add_hline(y=0.9, line_dash="dash", annotation_text="90%")
     fig.update_layout(title=viz.label, yaxis_title="Cumulative Variance", template='plotly_white', height=300)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key="viz_cumulative_variance")
 
 
 def _viz_projection_2d(model, X, y, task, feature_names, viz):
@@ -373,7 +416,7 @@ def _viz_projection_2d(model, X, y, task, feature_names, viz):
         fig.add_trace(go.Scatter(x=X_proj[:, 0], y=X_proj[:, 1] if X_proj.shape[1] > 1 else np.zeros(len(X_proj)),
                                   mode='markers', marker=dict(size=8, color='#3498db')))
     fig.update_layout(title=viz.label, xaxis_title="PC1", yaxis_title="PC2", template='plotly_white')
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key="viz_projection_2d")
 
 
 def _viz_loadings_heatmap(model, X, y, task, feature_names, viz):
@@ -384,7 +427,7 @@ def _viz_loadings_heatmap(model, X, y, task, feature_names, viz):
     fig = px.imshow(comp[:, :n_feat], text_auto=".2f", x=feature_names[:n_feat],
                     y=[f"PC{i+1}" for i in range(comp.shape[0])], color_continuous_scale='RdBu_r')
     fig.update_layout(title=viz.label, height=300)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key="viz_loadings_heatmap")
 
 
 def _viz_class_distribution(model, X, y, task, feature_names, viz):
@@ -393,7 +436,7 @@ def _viz_class_distribution(model, X, y, task, feature_names, viz):
     unique, counts = np.unique(y, return_counts=True)
     fig = go.Figure(go.Bar(x=[str(u) for u in unique], y=counts, marker_color='#3498db'))
     fig.update_layout(title=viz.label, xaxis_title="Class", yaxis_title="Count", template='plotly_white', height=300)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key="viz_class_distribution")
 
 
 def _viz_roc_curve(model, X, y, task, feature_names, viz):
@@ -408,7 +451,39 @@ def _viz_roc_curve(model, X, y, task, feature_names, viz):
     fig.add_trace(go.Scatter(x=fpr, y=tpr, mode='lines', name=f'ROC (AUC={roc_auc:.3f})', line=dict(color='#e74c3c', width=2)))
     fig.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode='lines', name='Random', line=dict(color='gray', dash='dash')))
     fig.update_layout(title=viz.label, xaxis_title="FPR", yaxis_title="TPR", template='plotly_white', height=350)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key="viz_roc_curve")
+
+
+def _viz_probability_distribution(model, X, y, task, feature_names, viz):
+    if not hasattr(model, 'predict_proba'):
+        return
+    
+    y_proba = model.predict_proba(X)[:, 1]
+    fig = go.Figure()
+    
+    if y is not None:
+        for cls in np.unique(y):
+            mask = y == cls
+            fig.add_trace(go.Histogram(x=y_proba[mask], name=f'Klasa {cls}', opacity=0.7, nbinsx=20))
+    else:
+        fig.add_trace(go.Histogram(x=y_proba, name='Prawdopodobieństwa', opacity=0.7, nbinsx=20))
+        
+    fig.update_layout(title=viz.label, xaxis_title="Prawdopodobieństwo P(y=1)", yaxis_title="Liczba próbek", 
+                      barmode='overlay', template='plotly_white', height=350)
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key="viz_prob_dist")
+
+
+def _viz_precision_recall_curve(model, X, y, task, feature_names, viz):
+    if not hasattr(model, 'predict_proba') or len(np.unique(y)) != 2:
+        return
+    from sklearn.metrics import precision_recall_curve, average_precision_score
+    y_proba = model.predict_proba(X)[:, 1]
+    precision, recall, _ = precision_recall_curve(y, y_proba)
+    ap = average_precision_score(y, y_proba)
+    
+    fig = go.Figure(go.Scatter(x=recall, y=precision, mode='lines', name=f'PR (AP={ap:.3f})', line=dict(color='#8e44ad', width=2)))
+    fig.update_layout(title=viz.label, xaxis_title="Recall (Czułość)", yaxis_title="Precision (Precyzja)", template='plotly_white', height=350)
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key="viz_pr_curve")
 
 
 def _viz_support_vectors(model, X, y, task, feature_names, viz):
@@ -428,41 +503,96 @@ def render_empty_results_panel(config: PluginConfig, X: Optional[np.ndarray], y:
 
     st.markdown("#### 🖼️ Wizualizacje")
     
-    # If X is provided, show the actual data preview. Otherwise, show empty grid.
+    # If X is provided, show the actual data preview ONCE at the top
     if X is not None:
-        if meta.task == "regression":
-            X_flat = X.reshape(-1, 1) if X.ndim == 1 else X
-            fig = go.Figure(go.Scatter(
-                x=X_flat[:, 0], y=y, mode='markers', name='Dane',
-                marker=dict(size=8, color='#3498db', opacity=0.7)
-            ))
-            fig.update_layout(title="Podgląd danych", template='plotly_white')
-        elif meta.task == "classification" and X.shape[1] >= 2:
-            fig = go.Figure()
-            for cls in np.unique(y):
-                mask = y == cls
-                fig.add_trace(go.Scatter(x=X[mask, 0], y=X[mask, 1], mode='markers', name=f'Klasa {cls}', marker=dict(size=8)))
-            fig.update_layout(title="Rozkład klas", template='plotly_white')
-        else:
-            fig = go.Figure()
-            fig.update_layout(title="Podgląd danych nedostępny", template='plotly_white')
-    else:
-        fig = go.Figure()
-        fig.update_layout(
-            title="Brak danych do wyświetlenia", template='plotly_white',
+        outliers = st.session_state.get("current_outliers")
+        has_outliers = outliers is not None and len(outliers) == len(X)
+        
+        with st.container(border=True):
+            if meta.task == "regression":
+                if X.shape[1] == 1:
+                    preview_fig = go.Figure()
+                    if has_outliers:
+                        preview_fig.add_trace(go.Scatter(x=X[~outliers, 0], y=y[~outliers], mode='markers', name='Dane (Normalne)', marker=dict(size=8, color='#3498db', opacity=0.7)))
+                        preview_fig.add_trace(go.Scatter(x=X[outliers, 0], y=y[outliers], mode='markers', name='Elementy Odstające', marker=dict(size=10, color='#e74c3c', opacity=0.9, symbol='x')))
+                    else:
+                        preview_fig.add_trace(go.Scatter(x=X[:, 0], y=y, mode='markers', name='Dane', marker=dict(size=8, color='#3498db', opacity=0.7)))
+                    
+                    title = "Podgląd danych wejściowych"
+                    xtit = feature_names[0] if feature_names else "Cecha 1 (X)"
+                else: 
+                    from sklearn.decomposition import PCA
+                    pca = PCA(n_components=1)
+                    X_pca = pca.fit_transform(X)
+                    preview_fig = go.Figure()
+                    if has_outliers:
+                        preview_fig.add_trace(go.Scatter(x=X_pca[~outliers, 0], y=y[~outliers], mode='markers', name='Dane (Normalne)', marker=dict(size=8, color='#3498db', opacity=0.7)))
+                        preview_fig.add_trace(go.Scatter(x=X_pca[outliers, 0], y=y[outliers], mode='markers', name='Elementy Odstające', marker=dict(size=10, color='#e74c3c', opacity=0.9, symbol='x')))
+                    else:
+                        preview_fig.add_trace(go.Scatter(x=X_pca[:, 0], y=y, mode='markers', name='Dane', marker=dict(size=8, color='#3498db', opacity=0.7)))
+                        
+                    title = "Podgląd: Cel vs Główny Składnik PCA (Redukcja wymiaru do X)"
+                    xtit = "Główny Składnik 1 (PCA)"
+                
+                preview_fig.update_layout(title=title, xaxis_title=xtit, yaxis_title="Cel (y)", template='plotly_white')
+                st.plotly_chart(preview_fig, use_container_width=True, config={'displayModeBar': False}, key="empty_data_preview")
+                
+            elif meta.task == "classification":
+                if X.shape[1] == 1:
+                    preview_fig = go.Figure()
+                    for cls in np.unique(y):
+                        mask = y == cls
+                        preview_fig.add_trace(go.Histogram(x=X[mask, 0], name=f'Klasa {cls}', opacity=0.7))
+                    preview_fig.update_layout(title="Podgląd: Rozkład klas dla pojedynczej cechy", 
+                                            xaxis_title=feature_names[0] if feature_names else "Cecha", 
+                                            barmode='overlay', template='plotly_white')
+                elif X.shape[1] == 2:
+                    preview_fig = go.Figure()
+                    for cls in np.unique(y):
+                        mask = y == cls
+                        preview_fig.add_trace(go.Scatter(x=X[mask, 0], y=X[mask, 1], mode='markers', name=f'Klasa {cls}', marker=dict(size=8)))
+                    preview_fig.update_layout(title="Podgląd wczytanych danych w 2D", 
+                                            xaxis_title=feature_names[0] if feature_names else "Cecha 1",
+                                            yaxis_title=feature_names[1] if feature_names else "Cecha 2",
+                                            template='plotly_white')
+                else:
+                    from sklearn.decomposition import PCA
+                    pca = PCA(n_components=2)
+                    X_pca = pca.fit_transform(X)
+                    preview_fig = go.Figure()
+                    for cls in np.unique(y):
+                        mask = y == cls
+                        preview_fig.add_trace(go.Scatter(x=X_pca[mask, 0], y=X_pca[mask, 1], mode='markers', name=f'Klasa {cls}', marker=dict(size=8)))
+                    preview_fig.update_layout(title="Podgląd danych wielowymiarowych (Rzut PCA w 2D)",
+                                            xaxis_title="Zmienna Latentna 1 (PCA)",
+                                            yaxis_title="Zmienna Latentna 2 (PCA)", template='plotly_white')
+                    
+                st.plotly_chart(preview_fig, use_container_width=True, config={'displayModeBar': False}, key="empty_data_preview")
+
+    # Create the generic grey placeholder for the actual model visuals
+    placeholder_fig = go.Figure()
+    if X is None:
+        placeholder_fig.update_layout(
+            template='plotly_white',
             xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
             yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
             annotations=[dict(text="Wczytaj dane z panelu po lewej stronie", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False, font=dict(color="#bbb"))]
         )
+    else:
+        placeholder_fig.update_layout(
+            template='plotly_white',
+            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            annotations=[dict(text="Kliknij 'Run Model' aby wygenerować tę wizualizację", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False, font=dict(color="#bbb"))]
+        )
 
-    if main_vizs:
-        st.plotly_chart(fig, use_container_width=True)
-
-    if side_vizs:
-        cols = st.columns(len(side_vizs))
-        for col in cols:
-            with col:
-                st.plotly_chart(fig, use_container_width=True)
+    # --- MAIN VIZS ---
+    if main_vizs and X is None:
+        for i, viz in enumerate(main_vizs):
+            with st.container(border=True):
+                f = go.Figure(placeholder_fig)
+                f.update_layout(title=f"{viz.label} (oczekiwanie)")
+                st.plotly_chart(f, use_container_width=True, config={'displayModeBar': False}, key=f"empty_main_{i}")
 
     # --- EQUATION ---
     eq_vizs = [v for v in visible_vizs if v.name == "equation" and v.position == "top"]
@@ -481,21 +611,69 @@ def render_empty_results_panel(config: PluginConfig, X: Optional[np.ndarray], y:
     if visible_metrics:
         with st.container(border=True):
             st.markdown("**📈 Metryki jakości**")
-            cols = st.columns(len(visible_metrics))
-            for col, m in zip(cols, visible_metrics):
-                col.metric(label=m.label, value="0.00" if m.format != "percent" else "0%")
+            inner_cols = st.columns(len(visible_metrics))
+            for i, m in enumerate(visible_metrics):
+                inner_cols[i].metric(label=m.label, value="0.00" if m.format != "percent" else "0%")
                 if m.hint:
-                    col.caption(m.hint[:100])
-
-    # --- MODEL ATTRIBUTES / OUTPUTS ---
-    visible_outputs = [o for o in config.outputs if o.show]
-    if visible_outputs:
-        st.markdown("#### 📊 Atrybuty modelu")
-        for o in visible_outputs:
-            with st.expander(f"📋 {o.label}", expanded=False):
-                st.write("**—**")
+                    inner_cols[i].caption(m.hint[:100])
 
     # --- BOTTOM VISUALIZATIONS ---
+    # Stacked vertically
     if bottom_vizs:
-        for viz in bottom_vizs:
-            st.plotly_chart(fig, use_container_width=True)
+        for i, viz in enumerate(bottom_vizs):
+            with st.container(border=True):
+                f = go.Figure(placeholder_fig)
+                f.update_layout(title=f"{viz.label} (oczekiwanie)")
+                st.plotly_chart(f, use_container_width=True, config={'displayModeBar': False}, key=f"empty_bottom_{i}")
+
+
+def render_side_visualizations(config: PluginConfig, model, X, y, task, feature_names):
+    """Renders side-positioned visualizations (e.g. for the left column)."""
+    side_vizs = [v for v in config.visualizations if v.show and v.position == "side"]
+    for viz in side_vizs:
+        _render_viz(viz, model, X, y, task, feature_names)
+
+
+def render_side_visualizations_skeleton(config: PluginConfig, X_available: bool):
+    """Renders side-positioned visualization skeletons."""
+    side_vizs = [v for v in config.visualizations if v.show and v.position == "side"]
+    if not side_vizs:
+        return
+        
+    placeholder_fig = go.Figure()
+    text = "Wczytaj dane podgląd..." if not X_available else "Kliknij 'Run Model'..."
+    placeholder_fig.update_layout(
+        template='plotly_white',
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        annotations=[dict(text=text, xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False, font=dict(color="#bbb"))]
+    )
+
+    for i, viz in enumerate(side_vizs):
+        with st.container(border=True):
+            f = go.Figure(placeholder_fig)
+            f.update_layout(title=f"{viz.label} (oczekiwanie)")
+            st.plotly_chart(f, use_container_width=True, config={'displayModeBar': False}, key=f"empty_side_skeleton_{i}")
+
+
+def render_model_attributes_card(config: PluginConfig, model, feature_names: List[str]):
+    """Renders the Model Attributes card for the left column."""
+    outputs = get_model_outputs(model, feature_names, config)
+    if outputs:
+        with st.container(border=True):
+            st.markdown("**📊 Atrybuty modelu**")
+            for attr_name, odata in outputs.items():
+                _render_output(attr_name, odata, feature_names)
+
+
+def render_model_attributes_skeleton(config: PluginConfig):
+    """Renders the Model Attributes skeleton for the left column."""
+    visible_outputs = [o for o in config.outputs if o.show]
+    if visible_outputs:
+        with st.container(border=True):
+            st.markdown("**📊 Atrybuty modelu**")
+            for o in visible_outputs:
+                st.markdown(f"**📋 {o.label}**")
+                st.write("—")
+                st.markdown("<hr style='margin:12px 0; border:none; border-top:1px solid #f0f0f0'>", unsafe_allow_html=True)
+

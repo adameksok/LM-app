@@ -1,8 +1,10 @@
 import streamlit as st
 import shutil
 from pathlib import Path
+import datetime
 from core.plugin_engine import get_plugin_engine
 from core.plugin_interface import PluginConfig
+from core.model_storage import list_saved_models, delete_model
 
 MODELS_DIR = Path(__file__).parent.parent / "models"
 
@@ -180,6 +182,12 @@ def render_dashboard():
 
     _inject_dashboard_css()
 
+    if "plugin_uploader_key" not in st.session_state:
+        st.session_state.plugin_uploader_key = 0
+    if "install_success" in st.session_state:
+        st.success(st.session_state.install_success)
+        del st.session_state.install_success
+
     st.markdown("""
         <div class="dash-header">
             <div class="label">Your Models</div>
@@ -202,6 +210,23 @@ def render_dashboard():
     add_col_idx = len(all_items) % 4
     with cols[add_col_idx]:
         _render_add_tile()
+
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("""
+        <div class="dash-header">
+            <div class="label">Twoje Zapisane Analizy</div>
+            <h2>💾 Zapisane Modele i Walidacja</h2>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    saved_models = list_saved_models()
+    if not saved_models:
+        st.info("Nie zapisałeś jeszcze żadnego modelu. Wejdź w dowolny model, wgraj dane, wytrenuj i kliknij 'Zapisz Model'.")
+    else:
+        scols = st.columns(4, gap="medium")
+        for i, sm_data in enumerate(saved_models):
+            with scols[i % 4]:
+                _render_saved_tile(sm_data)
 
 
 def _render_tile(plugin_id: str, config: PluginConfig):
@@ -249,6 +274,7 @@ def _render_tile(plugin_id: str, config: PluginConfig):
                 if plugin_file.exists():
                     plugin_file.unlink()
                 st.cache_resource.clear()
+                st.session_state.plugin_uploader_key += 1
                 st.rerun()
             except Exception as e:
                 st.error(f"Cannot delete: {e}")
@@ -269,7 +295,7 @@ def _render_add_tile():
     uploaded = st.file_uploader(
         "Upload a plugin .py file",
         type=["py"],
-        key="plugin_uploader",
+        key=f"plugin_uploader_{st.session_state.plugin_uploader_key}",
         label_visibility="collapsed"
     )
 
@@ -281,5 +307,60 @@ def _render_add_tile():
         if st.button("Zainstaluj", key="btn_install", use_container_width=True):
             dest.write_bytes(uploaded.getvalue())
             st.cache_resource.clear()
-            st.success(f"✅ Zainstalowano `{uploaded.name}`!")
+            st.session_state.plugin_uploader_key += 1
+            st.session_state.install_success = f"✅ Zainstalowano `{uploaded.name}`!"
             st.rerun()
+
+def _render_saved_tile(sm_data: dict):
+    model_id = sm_data["id"]
+    name = sm_data["name"]
+    task = sm_data["task"]
+    created_at = sm_data["created_at"]
+    
+    date_str = datetime.datetime.fromtimestamp(created_at).strftime('Data: %d.%m.%Y, Time:%H:%M:%S')
+    
+    plugin_id = sm_data.get("plugin_id", "")
+    is_linear = "linear" in plugin_id.lower() or "liniow" in name.lower()
+    
+    if not name or is_linear:
+        name = "RL"
+        
+    color = TASK_COLORS.get(task, "#1565C0")
+    icon = "📈" if is_linear else TASK_ICONS.get(task, "📊")
+    task_label = TASK_LABELS.get(task, task)
+    bg_light = color + "18"
+
+    badge_html = f'<span class="card-badge" style="background:{bg_light}; color:{color};">ZAPISANY</span>'
+    desc = f"{date_str}<br>Cechy wejściowe: {len(sm_data.get('feature_names',[]))}"
+
+    card_html = f"""
+    <div class="model-card">
+        <div class="card-top">
+            <div class="card-icon" style="background:{bg_light}; color:{color};">{icon}</div>
+            {badge_html}
+        </div>
+        <div>
+            <div class="card-title">{name}</div>
+            <div class="card-desc" style="-webkit-line-clamp: 4;">{desc}</div>
+        </div>
+        <div class="card-bottom">
+            <span>{task_label}</span>
+        </div>
+    </div>
+    """
+    st.markdown(card_html, unsafe_allow_html=True)
+
+    bcol1, bcol2 = st.columns([3, 1])
+    with bcol1:
+        if st.button("Walidacja →", key=f"val_{model_id}", use_container_width=True):
+            st.session_state.current_view = "saved_model"
+            st.session_state.current_saved_model_id = model_id
+            st.rerun()
+    with bcol2:
+        if st.button("🗑️", key=f"delsm_{model_id}", help="Usuń zapisany model", use_container_width=True):
+            try:
+                delete_model(model_id)
+                st.toast("Usunięto model")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Cannot delete: {e}")
