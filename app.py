@@ -17,7 +17,7 @@ from components.visualization import render_results_panel, render_empty_results_
 from core.plugin_engine import get_plugin_engine
 from core.session_state import init_session_state
 from core.plugin_interface import ParameterConfig
-from core.i18n import t, render_language_selector
+from core.i18n import t, render_language_selector, inject_uploader_translations
 from typing import List, Dict, Any
 
 # ── Custom CSS ──
@@ -308,6 +308,7 @@ def _render_settings_tab(config):
 
 def render_experiment_view():
     st.markdown(APP_CSS, unsafe_allow_html=True)
+    inject_uploader_translations()
 
     engine = get_plugin_engine()
     config = engine.get_plugin(st.session_state.current_model_id)

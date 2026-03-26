@@ -222,5 +222,10 @@
   "sidebar": {
     "model_parameters": "⚙️ Model Parameters",
     "no_params": "No configurable parameters for this model."
+  },
+  "file_uploader": {
+    "drag_here": "Drag and drop file here",
+    "limit_text": "Limit 200MB per file • CSV, XLSX, JSON",
+    "browse_files": "BROWSE FILES"
   }
 }

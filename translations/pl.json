@@ -222,5 +222,10 @@
   "sidebar": {
     "model_parameters": "⚙️ Parametry modelu",
     "no_params": "Brak konfigurowalnych parametrów dla tego modelu."
+  },
+  "file_uploader": {
+    "drag_here": "Przeciągnij i upuść plik tutaj",
+    "limit_text": "Limit 200MB na plik • CSV, XLSX, JSON",
+    "browse_files": "PRZEGLĄDAJ PLIKI"
   }
 }
