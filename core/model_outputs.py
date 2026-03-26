@@ -136,6 +136,15 @@ def calculate_metrics(model, X, y, task: str, config: PluginConfig) -> Dict[str,
 # EQUATION BUILDER
 # =========================================================================
 
+def _format_latex(name: str) -> str:
+    """Formats feature names for LaTeX, handling multiple underscores as subscripts."""
+    parts = name.split("_")
+    res = rf"\text{{{parts[0]}}}"
+    for p in parts[1:]:
+        res = rf"{res}_{{\text{{{p}}}}}"
+    return res
+
+
 def build_equation(model, feature_names: List[str], task: str) -> Optional[str]:
     if not hasattr(model, 'coef_'):
         return None
@@ -149,13 +158,17 @@ def build_equation(model, feature_names: List[str], task: str) -> Optional[str]:
 
     terms = []
     for i, (c, name) in enumerate(zip(coef, feature_names)):
-        sign = "+" if c >= 0 and i > 0 else ""
-        terms.append(f"{sign}{c:.3f}·{name}")
+        sign = "+" if c >= 0 and i > 0 else "-" if c < 0 else ""
+        val = abs(c)
+        formatted_name = _format_latex(name)
+        terms.append(rf"{sign} {val:.3f} \cdot {formatted_name}")
 
-    intercept_str = f"+{intercept:.3f}" if intercept >= 0 else f"{intercept:.3f}"
+    intercept_val = abs(intercept)
+    intercept_sign = "+" if intercept >= 0 else "-"
+    intercept_str = f"{intercept_sign} {intercept_val:.3f}"
 
     if task == "regression":
-        return f"ŷ = {' '.join(terms)} {intercept_str}"
+        return rf"\hat{{y}} = {' '.join(terms)} {intercept_str}"
     elif task == "classification":
-        return f"logit(p) = {' '.join(terms)} {intercept_str}"
+        return rf"\text{{logit}}(p) = {' '.join(terms)} {intercept_str}"
     return None

@@ -12,6 +12,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+from core.i18n_utils import t, load_translations
+from components.sidebar import render_sidebar
 from components.dashboard import render_dashboard
 from components.visualization import render_results_panel, render_empty_results_panel
 from core.plugin_engine import get_plugin_engine
@@ -61,14 +63,26 @@ section[data-testid="stSidebar"] {
     font-size: 18px; font-weight: 700; color: #1A1A2E;
 }
 
-/* ── Data dropzone ── */
-.data-dropzone {
-    border: 2px dashed #D0D5DD; border-radius: 12px;
-    padding: 36px 20px; text-align: center; background: #FAFBFC;
+/* ── Data dropzone (Now applies to native stFileUploader) ── */
+[data-testid='stFileUploader'] section {
+    border: 2px dashed #D0D5DD !important; border-radius: 12px !important;
+    padding: 24px 20px !important; text-align: center !important; background: #FAFBFC !important;
     transition: border-color 0.2s;
 }
-.data-dropzone:hover { border-color: #1976D2; }
-.data-dz-icon { font-size: 32px; color: #888; margin-bottom: 10px; }
+[data-testid='stFileUploader'] section:hover { border-color: #1976D2 !important; }
+
+/* Hide native text */
+[data-testid='stFileUploader'] section div[data-testid='stMarkdownContainer'] p {
+    display: none !important;
+}
+[data-testid='stFileUploader'] section > div > div > small {
+    display: none !important;
+}
+[data-testid='stFileUploader'] label {
+    display: none !important;
+}
+
+/* Navigation & Header Cleanup (Previously redundant icons fix) */
 .data-dz-title { font-size: 15px; font-weight: 600; color: #1A1A2E; margin-bottom: 4px; }
 .data-dz-sub { font-size: 12px; color: #888; }
 .data-formats { display: flex; gap: 8px; margin-top: 14px; }
@@ -105,55 +119,155 @@ div[data-testid="stVerticalBlockBorderWrapper"],
 div[data-testid="stExpander"] {
     background-color: #ffffff;
 }
+    /* Aligned Alert Boxes */
+    .ml-alert {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin: 10px 0;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+    .ml-alert-info { background: #ebf5ff; border-left: 5px solid #1976d2; color: #1a1a2e; }
+    .ml-alert-warning { background: #fff9e6; border-left: 5px solid #ffa000; color: #1a1a2e; }
+    .ml-alert-success { background: #eaf7ed; border-left: 5px solid #2e7d32; color: #1a1a2e; }
 </style>
 """
 
+def inject_custom_i18n_css():
+    """Injects dynamic CSS based on current language for st.file_uploader."""
+    lang = st.session_state.get("lang", "en")
+    page = st.session_state.get("page", "dashboard")
+    
+    # Text strings for uploader
+    if lang == "pl":
+        dz_title = "Wybierz plik lub przeciągnij i upuść"
+        if page == "dashboard":
+            dz_sub = "Format: Plik wtyczki (.py)"
+        elif page == "saved_model":
+             dz_sub = "Format: Plik .csv z danymi testowymi"
+        else:
+            dz_sub = "Formaty: CSV, XLSX lub JSON (do 10MB)"
+        btn_text = "SZUKAJ PLIKÓW"
+    else:
+        dz_title = "Choose a file or drag & drop"
+        if page == "dashboard":
+            dz_sub = "Format: Plugin file (.py)"
+        elif page == "saved_model":
+             dz_sub = "Format: .csv file with test data"
+        else:
+            dz_sub = "Formats: CSV, XLSX or JSON (max 10MB)"
+        btn_text = "BROWSE FILES"
 
-def main():
-    init_session_state()
+    st.markdown(f"""
+    <style>
+    /* 1. Hide the native English labels within the dropzone labels container */
+    [data-testid='stFileUploadDropzone'] > div:first-child > div > span {{
+        display: none !important;
+    }}
+    
+    /* 2. Layout for the section to accommodate pseudo-elements */
+    [data-testid='stFileUploader'] section {{
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 12px !important;
+        min-height: 200px !important;
+    }}
 
-    if st.session_state.current_view == "dashboard":
-        render_dashboard()
-    elif st.session_state.current_view == "experiment":
-        render_experiment_view()
-    elif st.session_state.current_view == "saved_model":
-        from components.saved_model_view import render_saved_model_view
-        render_saved_model_view()
+    /* 3. Add Polish Title/Icon via ::before - positioned inside the labels div */
+    [data-testid='stFileUploadDropzone'] > div:first-child::before {{
+        content: "☁️\\A {dz_title}";
+        white-space: pre-wrap;
+        display: block;
+        text-align: center;
+        font-size: 16px;
+        font-weight: 600;
+        color: #1A1A2E;
+        margin-bottom: 8px;
+    }}
+    
+    /* 4. Add Polish Subtext via ::after - positioned inside the labels div */
+    [data-testid='stFileUploadDropzone'] > div:first-child::after {{
+        content: "{dz_sub}";
+        display: block;
+        text-align: center;
+        font-size: 12px;
+        color: #888;
+        margin-top: 8px;
+    }}
+    
+    /* 5. Button localization and styling */
+    [data-testid='stFileUploader'] button {{
+        font-size: 0 !important;
+        padding: 10px 24px !important;
+    }}
+    [data-testid='stFileUploader'] button::before {{
+        content: "{btn_text}";
+        font-size: 13px;
+        font-weight: 700;
+        visibility: visible;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+
+
+
+
 
 
 def _render_sidebar_nav(meta):
     """Sidebar: branding + navigation + actions."""
 
-    st.markdown("""
+    st.markdown(f"""
     <div class="sidebar-brand">
-        <h2>ML Insights</h2>
-        <div class="sub">Insight Architect</div>
+        <h2>{t('sidebar.title')}</h2>
+        <div class="sub">{t('sidebar.subtitle')}</div>
     </div>
     """, unsafe_allow_html=True)
 
     st.divider()
 
     # Navigation
-    if st.button("🏠  Models", use_container_width=True):
-        st.session_state.current_view = "dashboard"
+    # Step 3: Global Language Selector (PRD requirement)
+    current_lang = st.session_state.get("lang", "en")
+    lang_idx = 0 if current_lang == "en" else 1
+    
+    new_lang = st.sidebar.selectbox(
+        t("sidebar.lang_selector"),
+        options=["en", "pl"],
+        index=lang_idx,
+        key="lang_selector_widget" # Use a unique key to prevent collisions
+    )
+    
+    # Update session state if changed
+    if new_lang != current_lang:
+        st.session_state["lang"] = new_lang
+        st.rerun()
+
+    if st.sidebar.button(t("sidebar.nav_models"), use_container_width=True):
+        st.session_state.page = "dashboard"
         st.cache_resource.clear()
         st.rerun()
 
-    st.button("📊  Data", use_container_width=True, disabled=True)
-    st.button("📈  Analysis", use_container_width=True, disabled=True)
+    st.button(t("sidebar.nav_data"), use_container_width=True, disabled=True)
+    st.button(t("sidebar.nav_analysis"), use_container_width=True, disabled=True)
 
     # Spacer
     st.markdown("<br>" * 8, unsafe_allow_html=True)
 
     # New experiment
-    if st.button("＋ New Experiment", type="primary", use_container_width=True):
-        st.session_state.current_view = "dashboard"
+    if st.button(t("sidebar.new_experiment"), type="primary", use_container_width=True):
+        st.session_state.page = "dashboard"
         st.cache_resource.clear()
         st.rerun()
 
     st.divider()
-    st.caption("📖 Documentation")
-    st.caption("💬 Support")
+    st.caption(t("sidebar.nav_docs"))
+    st.caption(t("sidebar.nav_support"))
 
 
 def _render_param_controls(parameters: List[ParameterConfig]) -> Dict[str, Any]:
@@ -161,7 +275,7 @@ def _render_param_controls(parameters: List[ParameterConfig]) -> Dict[str, Any]:
     params = {}
 
     if not parameters:
-        st.caption("Brak konfigurowalnych parametrów.")
+        st.caption(t("sidebar.no_params_info"))
         return params
 
     for param in parameters:
@@ -322,18 +436,19 @@ def render_experiment_view():
     if not config:
         st.error("❌ Plugin not found!")
         if st.button("← Back to Dashboard"):
-            st.session_state.current_view = "dashboard"
+            st.session_state.page = "dashboard"
             st.rerun()
         return
 
     meta = config.metadata
 
-    # === SIDEBAR ===
-    with st.sidebar:
-        _render_sidebar_nav(meta)
 
     # === TOP TABS ===
-    tab_setup, tab_history, tab_settings = st.tabs(["⚡ Model Setup", "📜 History", "⚙️ Settings"])
+    tab_setup, tab_history, tab_settings = st.tabs([
+        f"⚡ {t('experiment.tab_setup')}", 
+        f"📜 {t('experiment.tab_history')}", 
+        f"⚙️ {t('experiment.tab_settings')}"
+    ])
 
     # ================================================================
     # TAB: Model Setup — Option B: Control Panel (left) + Results (right)
@@ -371,16 +486,15 @@ def render_experiment_view():
         with col_ctrl:
             # ── Architecture (compact) ──
             with st.container(border=True):
-                hcol1, hcol2 = st.columns([3, 1])
-                with hcol1:
-                    st.markdown("**⚙️ Architecture**")
-                with hcol2:
-                    st.markdown(
-                        '<span style="font-size:11px;font-weight:700;letter-spacing:0.5px;'
-                        'padding:4px 12px;border-radius:999px;background:#E8F5E9;color:#2E7D32;">'
-                        'CONFIGURED</span>',
-                        unsafe_allow_html=True
-                    )
+                st.markdown(f"**{t('experiment.architecture')}**")
+                st.markdown(
+                    '<div style="margin-bottom: 15px;">'
+                    '<span style="font-size:11px;font-weight:700;letter-spacing:0.5px;'
+                    'padding:4px 10px;border-radius:20px;background:#E8F5E9;color:#2E7D32;">'
+                    f'{t("experiment.configured")}</span>'
+                    '</div>',
+                    unsafe_allow_html=True
+                )
 
                 task_icons = {"classification": "🎯", "regression": "📈", "clustering": "🔄", "dimensionality_reduction": "📊"}
                 st.markdown(f"**{meta.model_class}** · {task_icons.get(meta.task, '📊')} {meta.task}")
@@ -401,12 +515,12 @@ def render_experiment_view():
             run_action_placeholder = st.empty()
 
             # ── Adjust Parameters ──
-            with st.expander("☰ Adjust Parameters", expanded=False):
+            with st.expander(f"☰ {t('experiment.adjust_params')}", expanded=False):
                 params = _render_param_controls(config.parameters)
 
             # ── Load Data ──
             with st.container(border=True):
-                st.markdown("**📁 Load Data**")
+                st.markdown(f"**{t('experiment.load_data')}**")
                 raw_df, source_type = _render_data_card(meta)
                 
             # ── Data Preparation ──
@@ -466,7 +580,7 @@ def render_experiment_view():
             if system_msgs:
                 with st.expander(f"✉️ Komunikaty systemu ({len(system_msgs)})", expanded=False):
                     for msg in system_msgs:
-                        st.info(f"{msg}")
+                        st.markdown(f'<div class="ml-alert ml-alert-info"><span>💡</span><div>{msg}</div></div>', unsafe_allow_html=True)
 
             # ── Model Attributes & Sidebar Visualizations (Left Column) ──
             if st.session_state.get("model_ran", False):
@@ -503,9 +617,9 @@ def render_experiment_view():
                 if run_X is not None:
                     r_col1, r_col2 = st.columns([3, 1])
                     with r_col1:
-                        st.markdown("### 📊 Wyniki")
+                        st.markdown(f"### 📊 {t('experiment.results_header')}")
                     with r_col2:
-                        if st.button("💾 Zapisz Model", use_container_width=True):
+                        if st.button(t("experiment.btn_save_model"), use_container_width=True):
                             from core.model_storage import save_model
                             try:
                                 save_model(
@@ -517,15 +631,15 @@ def render_experiment_view():
                                     target_name=st.session_state.get("last_run_target", "Target"),
                                     user_params=run_params
                                 )
-                                st.toast("✅ Model został zapisany pomyślnie!")
+                                st.toast(f"✅ {t('experiment.save_success')}!")
                             except Exception as e:
-                                st.error(f"Nie udało się zapisać modelu: {e}")
+                                st.error(f"{t('experiment.save_error')}: {e}")
                     try:
                         render_results_panel(config, config.model_instance, run_X, run_y, run_params, run_features)
                     except Exception as e:
-                        st.error(f"⚠️ Błąd: {e}")
+                        st.error(f"⚠️ {t('generic.error')}: {e}")
                 else:
-                    st.info("Kliknij **▶ Run Model** aby zobaczyć wyniki.")
+                    st.markdown(f'<div class="ml-alert ml-alert-info"><span>▶️</span><div>{t("experiment.run_model_info")}</div></div>', unsafe_allow_html=True)
             else:
                 current_X = st.session_state.get("current_X")
                 current_y = st.session_state.get("current_y")
@@ -539,15 +653,14 @@ def render_experiment_view():
                         current_features
                     )
                 except Exception as e:
-                    st.error(f"⚠️ Błąd renderowania widoku startowego: {e}")
+                    st.error(f"⚠️ {t('experiment.render_error')}: {e}")
 
     # ================================================================
     # TAB: History
     # ================================================================
     with tab_history:
         st.markdown("#### 📜 Experiment History")
-        st.info("Historia eksperymentów będzie dostępna po uruchomieniu modelu. "
-                "Każde uruchomienie zapisze parametry, metryki i wyniki.")
+        st.info(t("experiment.history_info"))
         st.caption("Coming soon in next release.")
 
     # ================================================================
@@ -575,34 +688,47 @@ def _render_ai_suggestion(meta):
 def _render_data_card(meta):
     """Renders the Load Data card. Returns (raw_df, source_type)."""
     
-    def _reset_model_ran():
+    def _reset_data_state():
+        """Clears current preparing data state to prevent contamination."""
         st.session_state["model_ran"] = False
+        keys_to_clear = [
+            "current_X", "current_y", "current_features", "current_target", 
+            "current_outliers", "raw_df_cache"
+        ]
+        for k in keys_to_clear:
+            if k in st.session_state:
+                st.session_state[k] = None
 
     raw_df = None
     source_type = None
 
     # Source selector
+    source_options = ["upload", "sample"]
+    source_labels = {
+        "upload": t("experiment.data_source_upload"),
+        "sample": t("experiment.data_source_sample")
+    }
+    
     csv_selected = st.radio(
         "source",
-        ["📄 Upload CSV file", "🧪 Use sample dataset"],
+        options=source_options,
+        format_func=lambda x: source_labels.get(x, x),
         horizontal=True,
         label_visibility="collapsed",
-        key="data_source_radio",
-        on_change=_reset_model_ran
+        key=f"data_source_radio_{st.session_state.current_model_id}",
+        on_change=_reset_data_state
     )
 
-    if csv_selected == "📄 Upload CSV file":
+    if csv_selected == "upload":
         source_type = "csv"
-        # Dropzone visual
-        st.markdown("""
-        <div class="data-dropzone">
-            <div class="data-dz-icon">☁️</div>
-            <div class="data-dz-title">Drag & Drop training data</div>
-            <div class="data-dz-sub">Supports .csv, .xlsx, and .json formats up to 50MB.</div>
-        </div>
-        """, unsafe_allow_html=True)
+        # (The custom dropzone div is removed here as it's now handled by CSS on the native uploader)
 
-        uploaded = st.file_uploader("Upload", type=["csv", "xlsx", "json"], label_visibility="collapsed")
+        uploaded = st.file_uploader(
+            t("experiment.browse_files"), 
+            type=["csv", "xlsx", "json"], 
+            label_visibility="collapsed",
+            key=f"uploader_{st.session_state.current_model_id}"
+        )
 
         if uploaded:
             ext = uploaded.name.split(".")[-1].lower()
@@ -615,7 +741,7 @@ def _render_data_card(meta):
             else:
                 raw_df = pd.read_csv(uploaded)
 
-            st.dataframe(raw_df, use_container_width=True, height=280)
+            # Removed redundant preview table from left column
 
         # Format tags
         st.markdown(
@@ -627,7 +753,7 @@ def _render_data_card(meta):
             unsafe_allow_html=True
         )
 
-    elif csv_selected == "🧪 Use sample dataset":
+    elif csv_selected == "sample":
         source_type = "sample"
         from core.data_generators import generate_dataset
 
@@ -653,22 +779,22 @@ def _render_data_card(meta):
                 "☁️ Brak korelacji (Chmura)": "random"
             }
             sel_trend = st.selectbox(
-                "Kształt danych (trend)", 
+                t("experiment.data_trend_label"), 
                 list(trend_options.keys()),
-                on_change=_reset_model_ran
+                on_change=_reset_data_state
             )
             trend_type = trend_options[sel_trend]
 
             if trend_type == "outliers":
-                n_outliers = st.slider("Liczba anomalii (0 = odcięcie)", 0, 20, 5, step=1, on_change=_reset_model_ran)
+                n_outliers = st.slider(t("experiment.data_outliers_label"), 0, 20, 5, step=1, on_change=_reset_model_ran)
 
         sc1, sc2 = st.columns(2)
         with sc1:
-            n_samples = st.slider("Liczba próbek", 30, 500, 150, step=10, on_change=_reset_model_ran)
+            n_samples = st.slider(t("experiment.data_n_samples"), 30, 500, 150, step=10, on_change=_reset_data_state)
         with sc2:
-            noise = st.slider("Poziom szumu", 0.01, 0.5, 0.15, step=0.01, on_change=_reset_model_ran)
+            noise = st.slider(t("experiment.data_noise"), 0.01, 0.5, 0.15, step=0.01, on_change=_reset_data_state)
 
-        if st.button("🎲 Losuj nowe punkty", use_container_width=True, on_click=_reset_model_ran):
+        if st.button(t("experiment.data_randomize"), use_container_width=True, on_click=_reset_data_state):
             st.session_state.data_seed += 1
 
         X, y, is_outlier = generate_dataset(
@@ -690,11 +816,40 @@ def _render_data_card(meta):
         if np.any(is_outlier):
             raw_df["_IsOutlier"] = is_outlier
 
-        st.dataframe(raw_df.drop(columns=["_IsOutlier"], errors="ignore"), use_container_width=True, height=280)
+        # Removed redundant preview table from left column
 
     return raw_df, source_type
 
+def main():
+    init_session_state()
+    load_translations()
+    inject_custom_i18n_css()
 
+    # Get metadata for sidebar if in experiment view
+    meta = None
+    page = st.session_state.get("page", "dashboard")
+    
+    if page == "experiment":
+        engine = get_plugin_engine()
+        config = engine.get_plugin(st.session_state.get("current_model_id"))
+        if config:
+            meta = config.metadata
+            
+    # Always render sidebar
+    with st.sidebar:
+        _render_sidebar_nav(meta)
+
+    # Main view routing
+    if page == "dashboard":
+        render_dashboard()
+    elif page == "experiment":
+        render_experiment_view()
+    elif page == "saved_model":
+        from components.saved_model_view import render_saved_model_view
+        render_saved_model_view()
 
 if __name__ == "__main__":
     main()
+
+
+

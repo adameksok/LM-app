@@ -15,7 +15,7 @@ EDU-ML SANDBOX — WTYCZKA MODELU
 RÓWNANIE MODELU
 ================================================================================
 
-@equation: y = M_{k}(\mathbf{x})
+@equation: r"y = M_{k}(\mathbf{x})"
 @cost_function: Brak klasycznej optymalizacji funkcji kosztu
 @cost_name: Leniwe Uczenie (Lazy Learning)
 
@@ -63,7 +63,7 @@ PARAMETRY — WIDOCZNE DLA STUDENTA
 @param: p
 @label: Metryka odległości
 @type: select
-@options: 1, 2
+@options: Manhattan:1, Euklidesowa:2
 @default: 2
 @hint: W jaki sposób mierzona jest przestrzeń "od jednego punktu do drugiego".
        

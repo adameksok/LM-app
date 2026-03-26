@@ -1,6 +1,7 @@
 import streamlit as st
 from core.plugin_interface import ParameterConfig
 from typing import List, Dict, Any
+from core.i18n_utils import t
 
 
 def render_sidebar(parameters: List[ParameterConfig]) -> Dict[str, Any]:
@@ -10,10 +11,10 @@ def render_sidebar(parameters: List[ParameterConfig]) -> Dict[str, Any]:
     """
     params = {}
 
-    st.sidebar.header("⚙️ Model Parameters")
-
+    st.sidebar.header(t("sidebar.params_header"))
+    
     if not parameters:
-        st.sidebar.info("No configurable parameters for this model.")
+        st.sidebar.info(t("sidebar.no_params"))
         return params
 
     for param in parameters:

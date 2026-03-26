@@ -1,5 +1,8 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
+from typing import Tuple, List, Optional
+from core.i18n_utils import t
 from core.data_prep import (
     detect_missing_values,
     detect_categorical_columns,
@@ -14,7 +17,7 @@ def render_preprocessing_card(raw_df: pd.DataFrame, task: str) -> tuple[pd.DataF
     Returns the cleaned dataframe, the selected target column name, and a list of structural messages.
     """
     st.markdown("---")
-    st.markdown("### 🧰 Data Preparation")
+    st.markdown(f"### 🧰 {t('data_prep.title')}")
     
     # We will work on a copy of the dataframe
     df = raw_df.copy()
@@ -22,89 +25,78 @@ def render_preprocessing_card(raw_df: pd.DataFrame, task: str) -> tuple[pd.DataF
 
     
     with st.container(border=True):
-        st.markdown("**Data Cleaning Steps**")
+        st.markdown(f"**{t('data_prep.cleaning_header')}**")
         
         # 1. MISSING VALUES
         missing_cols = detect_missing_values(df)
         if missing_cols:
-            st.warning(f"⚠️ Missing values found in columns: {', '.join(missing_cols)}")
-            imp_strategy_name = st.selectbox(
-                "Missing values strategy:",
+            st.markdown(f'<div class="ml-alert ml-alert-warning"><span>⚠️</span><div>{t("data_prep.missing_values_found")} {", ".join(missing_cols)}</div></div>', unsafe_allow_html=True)
+            imp_strategy_selection = st.selectbox(
+                label=t("data_prep.missing_values_label"),
                 options=[
-                    "Drop rows with missing values",
-                    "Impute with Mean",
-                    "Impute with Median",
-                    "Impute with Mode"
-                ]
+                    (t("data_prep.mv_drop"), "drop"),
+                    (t("data_prep.mv_mean"), "mean"),
+                    (t("data_prep.mv_median"), "median"),
+                    (t("data_prep.mv_mode"), "mode")
+                ],
+                format_func=lambda x: x[0],
+                help=t("data_prep.mv_help")
             )
             
-            # Map UI selection to strategy key
-            strategy_map = {
-                "Drop rows with missing values": "drop",
-                "Impute with Mean": "mean",
-                "Impute with Median": "median",
-                "Impute with Mode": "mode"
-            }
-            imp_strategy = strategy_map[imp_strategy_name]
+            imp_strategy = imp_strategy_selection[1] # Get the strategy key from the tuple
             
             df, rows_dropped = apply_imputation(df, imp_strategy, missing_cols)
             if imp_strategy == 'drop' and rows_dropped > 0:
-                msg = f"Usuwanie braków: Odrzucono {rows_dropped} wierszy z powodu wartości Null."
+                msg = t('data_prep.msg_missing_drop').format(rows_dropped=rows_dropped)
                 st.caption(msg)
                 prep_msgs.append(msg)
             elif rows_dropped > 0:
-                msg = f"Wypełnianie braków: Zastosowano metodę '{imp_strategy}' dla {rows_dropped} komórek."
+                msg = t('data_prep.msg_missing_impute').format(strategy=imp_strategy, cells=rows_dropped)
                 st.caption(msg)
                 prep_msgs.append(msg)
         else:
-            st.success("✅ No missing values found.")
+            st.markdown(f'<div class="ml-alert ml-alert-success"><span>✅</span><div>{t("data_prep.no_missing_values")}</div></div>', unsafe_allow_html=True)
 
         # 2. CATEGORICAL ENCODING
         cat_cols = detect_categorical_columns(df)
         if cat_cols:
-            st.warning(f"⚠️ Categorical text found in columns: {', '.join(cat_cols)}")
-            st.caption("ML models require numeric data.")
-            enc_strategy_name = st.selectbox(
-                "Encoding strategy:",
+            st.markdown(f'<div class="ml-alert ml-alert-warning"><span>⚠️</span><div>{t("data_prep.categorical_found")} {", ".join(cat_cols)}</div></div>', unsafe_allow_html=True)
+            st.caption(t("data_prep.ml_numeric_data_req"))
+            enc_strategy_selection = st.selectbox(
+                label=t("data_prep.categorical_label"),
                 options=[
-                    "One-Hot Encoding (Creates 0/1 dummy columns)",
-                    "Label Encoding (Assigns integers 0, 1, 2...)",
-                    "Drop categorical columns"
-                ]
+                    (t("data_prep.cat_onehot"), "one-hot"),
+                    (t("data_prep.cat_label"), "label"),
+                    (t("data_prep.cat_drop"), "drop")
+                ],
+                format_func=lambda x: x[0],
+                help=t("data_prep.cat_help")
             )
             
-            enc_map = {
-                "One-Hot Encoding (Creates 0/1 dummy columns)": "one-hot",
-                "Label Encoding (Assigns integers 0, 1, 2...)": "label",
-                "Drop categorical columns": "drop"
-            }
-            enc_strategy = enc_map[enc_strategy_name]
+            enc_strategy = enc_strategy_selection[1] # Get the strategy key from the tuple
             
             df = apply_encoding(df, enc_strategy, cat_cols)
             msg = f"Kodowanie tekstów: Kolumny ({', '.join(cat_cols)}) zmodyfikowano używając strategii '{enc_strategy}'."
             prep_msgs.append(msg)
         else:
-            st.success("✅ All columns are numeric.")
+            st.markdown(f'<div class="ml-alert ml-alert-success"><span>✅</span><div>{t("data_prep.all_numeric")}</div></div>', unsafe_allow_html=True)
 
         # 3. OUTLIERS (Only relevant for numeric continuous data, but we allow applying it generally to numeric cols)
         # Assuming the remaining columns are numeric
         numeric_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
         if numeric_cols:
-            outlier_strategy_name = st.selectbox(
-                "Outlier removal strategy:",
-                options=[
-                    "None (Keep original data)",
-                    "Z-Score (Remove > 3 standard deviations)",
-                    "IQR (Interquartile Range)"
-                ]
-            )
+            outlier_options = [
+                (t("data_prep.outlier_none"), "none"),
+                (t("data_prep.outlier_zscore"), "z-score"),
+                (t("data_prep.outlier_iqr"), "iqr")
+            ]
             
-            out_map = {
-                "None (Keep original data)": "none",
-                "Z-Score (Remove > 3 standard deviations)": "z-score",
-                "IQR (Interquartile Range)": "iqr"
-            }
-            out_strategy = out_map[outlier_strategy_name]
+            outlier_selection = st.selectbox(
+                label=t("data_prep.outlier_strategy_label"),
+                options=outlier_options,
+                format_func=lambda x: x[0]
+            )
+            out_strategy = outlier_selection[1]
             
             df, rows_dropped = remove_outliers(df, out_strategy, numeric_cols)
             if out_strategy != 'none' and rows_dropped > 0:
@@ -115,7 +107,7 @@ def render_preprocessing_card(raw_df: pd.DataFrame, task: str) -> tuple[pd.DataF
     # TARGET & FEATURE SELECTION
     target_col = None
     if task in ("classification", "regression") and not df.empty:
-        st.markdown("**🎯 Feature Selection**")
+        st.markdown(f"**🎯 {t('data_prep.feature_selection_header')}**")
         cols_list = list(df.columns)
         
         # Default target logic: try 'Target' or last column
@@ -126,7 +118,7 @@ def render_preprocessing_card(raw_df: pd.DataFrame, task: str) -> tuple[pd.DataF
             default_index = cols_list.index('Class')
             
         target_col = st.selectbox(
-            "Target Variable (y):",
+            t("data_prep.target_col_label"),
             cols_list,
             index=default_index,
             key="prep_target_col"
@@ -134,7 +126,7 @@ def render_preprocessing_card(raw_df: pd.DataFrame, task: str) -> tuple[pd.DataF
         
         available_features = [c for c in cols_list if c != target_col]
         selected_features = st.multiselect(
-            "Input Features (X):",
+            t("data_prep.features_col_label"),
             options=available_features,
             default=available_features,
             key="prep_features"
