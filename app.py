@@ -17,6 +17,7 @@ from components.visualization import render_results_panel, render_empty_results_
 from core.plugin_engine import get_plugin_engine
 from core.session_state import init_session_state
 from core.plugin_interface import ParameterConfig
+from core.i18n import t, render_language_selector, inject_uploader_translations
 from typing import List, Dict, Any
 
 # ── Custom CSS ──
@@ -134,26 +135,28 @@ def _render_sidebar_nav(meta):
     st.divider()
 
     # Navigation
-    if st.button("🏠  Models", use_container_width=True):
+    if st.button(t("nav.models"), use_container_width=True):
         st.session_state.current_view = "dashboard"
         st.cache_resource.clear()
         st.rerun()
 
-    st.button("📊  Data", use_container_width=True, disabled=True)
-    st.button("📈  Analysis", use_container_width=True, disabled=True)
+    st.button(t("nav.data"), use_container_width=True, disabled=True)
+    st.button(t("nav.analysis"), use_container_width=True, disabled=True)
 
     # Spacer
     st.markdown("<br>" * 8, unsafe_allow_html=True)
 
     # New experiment
-    if st.button("＋ New Experiment", type="primary", use_container_width=True):
+    if st.button(t("nav.new_experiment"), type="primary", use_container_width=True):
         st.session_state.current_view = "dashboard"
         st.cache_resource.clear()
         st.rerun()
 
     st.divider()
-    st.caption("📖 Documentation")
-    st.caption("💬 Support")
+    st.caption(t("nav.documentation"))
+    st.caption(t("nav.support"))
+    st.divider()
+    render_language_selector()
 
 
 def _render_param_controls(parameters: List[ParameterConfig]) -> Dict[str, Any]:
@@ -161,7 +164,7 @@ def _render_param_controls(parameters: List[ParameterConfig]) -> Dict[str, Any]:
     params = {}
 
     if not parameters:
-        st.caption("Brak konfigurowalnych parametrów.")
+        st.caption(t("experiment.no_params"))
         return params
 
     for param in parameters:
@@ -219,23 +222,23 @@ def _render_settings_tab(config):
 
     meta = config.metadata
 
-    st.markdown("#### 📋 Plugin Configuration")
+    st.markdown(t("settings.plugin_config"))
 
     # Source file
-    st.markdown(f"**Source file:** `{Path(config.source_file).name}`")
+    st.markdown(f"{t('settings.source_file')} `{Path(config.source_file).name}`")
 
     st.divider()
 
     # Metadata
-    st.markdown("##### 📌 Metadata")
+    st.markdown(t("settings.metadata_header"))
     meta_data = {
-        "Model Class": meta.model_class,
-        "Task": meta.task,
-        "Name": meta.name,
-        "Description": meta.description[:120] + "..." if len(meta.description) > 120 else meta.description,
-        "Icon": meta.icon or "—",
+        t("settings.meta_model_class"): meta.model_class,
+        t("settings.meta_task"): meta.task,
+        t("settings.meta_name"): meta.name,
+        t("settings.meta_description"): meta.description[:120] + "..." if len(meta.description) > 120 else meta.description,
+        t("settings.meta_icon"): meta.icon or "—",
     }
-    meta_html = '<table class="settings-table"><tr><th>Property</th><th>Value</th></tr>'
+    meta_html = f'<table class="settings-table"><tr><th>{t("settings.property")}</th><th>{t("settings.value")}</th></tr>'
     for k, v in meta_data.items():
         meta_html += f'<tr><td>{k}</td><td>{v}</td></tr>'
     meta_html += '</table>'
@@ -244,11 +247,11 @@ def _render_settings_tab(config):
     st.divider()
 
     # Parameters
-    st.markdown(f"##### ⚙️ Parameters ({len(config.parameters)})")
+    st.markdown(f"{t('settings.parameters_header')} ({len(config.parameters)})")
     if config.parameters:
-        param_html = '<table class="settings-table"><tr><th>Name</th><th>Label</th><th>Type</th><th>Default</th><th>Show</th></tr>'
+        param_html = f'<table class="settings-table"><tr><th>{t("settings.param_name")}</th><th>{t("settings.param_label")}</th><th>{t("settings.param_type")}</th><th>{t("settings.param_default")}</th><th>{t("settings.param_show_col")}</th></tr>'
         for p in config.parameters:
-            show_badge = '<span class="tag-badge" style="background:#E8F5E9;color:#2E7D32;">Show</span>' if p.show else '<span class="tag-badge" style="background:#FFF3E0;color:#E65100;">Hidden</span>'
+            show_badge = f'<span class="tag-badge" style="background:#E8F5E9;color:#2E7D32;">{t("settings.badge_show")}</span>' if p.show else f'<span class="tag-badge" style="background:#FFF3E0;color:#E65100;">{t("settings.badge_hidden")}</span>'
             param_html += f'<tr><td><code>{p.name}</code></td><td>{p.label}</td><td>{p.type}</td><td>{p.default}</td><td>{show_badge}</td></tr>'
         param_html += '</table>'
         st.markdown(param_html, unsafe_allow_html=True)
@@ -256,25 +259,25 @@ def _render_settings_tab(config):
     st.divider()
 
     # Outputs
-    st.markdown(f"##### 📊 Outputs ({len(config.outputs)})")
+    st.markdown(f"{t('settings.outputs_header')} ({len(config.outputs)})")
     if config.outputs:
-        out_html = '<table class="settings-table"><tr><th>Attribute</th><th>Label</th><th>Format</th><th>Show</th></tr>'
+        out_html = f'<table class="settings-table"><tr><th>{t("settings.out_attribute")}</th><th>{t("settings.out_label")}</th><th>{t("settings.out_format")}</th><th>{t("settings.out_show")}</th></tr>'
         for o in config.outputs:
-            show_badge = '<span class="tag-badge" style="background:#E8F5E9;color:#2E7D32;">Show</span>' if o.show else '<span class="tag-badge" style="background:#FFF3E0;color:#E65100;">Hidden</span>'
+            show_badge = f'<span class="tag-badge" style="background:#E8F5E9;color:#2E7D32;">{t("settings.badge_show")}</span>' if o.show else f'<span class="tag-badge" style="background:#FFF3E0;color:#E65100;">{t("settings.badge_hidden")}</span>'
             out_html += f'<tr><td><code>{o.name}</code></td><td>{o.label}</td><td>{o.format}</td><td>{show_badge}</td></tr>'
         out_html += '</table>'
         st.markdown(out_html, unsafe_allow_html=True)
     else:
-        st.caption("Defaults per @task")
+        st.caption(t("settings.outputs_default"))
 
     st.divider()
 
     # Metrics
-    st.markdown(f"##### 📈 Metrics ({len(config.metrics)})")
+    st.markdown(f"{t('settings.metrics_header')} ({len(config.metrics)})")
     if config.metrics:
-        met_html = '<table class="settings-table"><tr><th>ID</th><th>Label</th><th>Format</th><th>Good ≥</th><th>Show</th></tr>'
+        met_html = f'<table class="settings-table"><tr><th>{t("settings.met_id")}</th><th>{t("settings.met_label")}</th><th>{t("settings.met_format")}</th><th>{t("settings.met_good")}</th><th>{t("settings.met_show")}</th></tr>'
         for m in config.metrics:
-            show_badge = '<span class="tag-badge" style="background:#E8F5E9;color:#2E7D32;">Show</span>' if m.show else '<span class="tag-badge" style="background:#FFF3E0;color:#E65100;">Hidden</span>'
+            show_badge = f'<span class="tag-badge" style="background:#E8F5E9;color:#2E7D32;">{t("settings.badge_show")}</span>' if m.show else f'<span class="tag-badge" style="background:#FFF3E0;color:#E65100;">{t("settings.badge_hidden")}</span>'
             gv = f"{m.good_value}" if m.good_value is not None else "—"
             met_html += f'<tr><td><code>{m.name}</code></td><td>{m.label}</td><td>{m.format}</td><td>{gv}</td><td>{show_badge}</td></tr>'
         met_html += '</table>'
@@ -283,28 +286,29 @@ def _render_settings_tab(config):
     st.divider()
 
     # Visualizations
-    st.markdown(f"##### 🖼️ Visualizations ({len(config.visualizations)})")
+    st.markdown(f"{t('settings.viz_header')} ({len(config.visualizations)})")
     if config.visualizations:
-        viz_html = '<table class="settings-table"><tr><th>ID</th><th>Label</th><th>Position</th><th>Show</th></tr>'
+        viz_html = f'<table class="settings-table"><tr><th>{t("settings.viz_id")}</th><th>{t("settings.viz_label")}</th><th>{t("settings.viz_position")}</th><th>{t("settings.viz_show")}</th></tr>'
         for v in config.visualizations:
-            show_badge = '<span class="tag-badge" style="background:#E8F5E9;color:#2E7D32;">Show</span>' if v.show else '<span class="tag-badge" style="background:#FFF3E0;color:#E65100;">Hidden</span>'
+            show_badge = f'<span class="tag-badge" style="background:#E8F5E9;color:#2E7D32;">{t("settings.badge_show")}</span>' if v.show else f'<span class="tag-badge" style="background:#FFF3E0;color:#E65100;">{t("settings.badge_hidden")}</span>'
             viz_html += f'<tr><td><code>{v.name}</code></td><td>{v.label}</td><td>{v.position}</td><td>{show_badge}</td></tr>'
         viz_html += '</table>'
         st.markdown(viz_html, unsafe_allow_html=True)
 
     # Plugin source viewer
     st.divider()
-    st.markdown("##### 📝 Plugin Source")
-    with st.expander("View source code", expanded=False):
+    st.markdown(t("settings.plugin_source"))
+    with st.expander(t("settings.view_source"), expanded=False):
         try:
             source = Path(config.source_file).read_text(encoding="utf-8")
             st.code(source, language="python")
         except Exception:
-            st.warning("Cannot read source file.")
+            st.warning(t("settings.cannot_read_source"))
 
 
 def render_experiment_view():
     st.markdown(APP_CSS, unsafe_allow_html=True)
+    inject_uploader_translations()
 
     engine = get_plugin_engine()
     config = engine.get_plugin(st.session_state.current_model_id)
@@ -320,8 +324,8 @@ def render_experiment_view():
                 del st.session_state[k]
 
     if not config:
-        st.error("❌ Plugin not found!")
-        if st.button("← Back to Dashboard"):
+        st.error(t("experiment.plugin_not_found"))
+        if st.button(t("experiment.back_to_dashboard")):
             st.session_state.current_view = "dashboard"
             st.rerun()
         return
@@ -333,7 +337,7 @@ def render_experiment_view():
         _render_sidebar_nav(meta)
 
     # === TOP TABS ===
-    tab_setup, tab_history, tab_settings = st.tabs(["⚡ Model Setup", "📜 History", "⚙️ Settings"])
+    tab_setup, tab_history, tab_settings = st.tabs([t("tab.model_setup"), t("tab.history"), t("tab.settings")])
 
     # ================================================================
     # TAB: Model Setup — Option B: Control Panel (left) + Results (right)
@@ -373,7 +377,7 @@ def render_experiment_view():
             with st.container(border=True):
                 hcol1, hcol2 = st.columns([3, 1])
                 with hcol1:
-                    st.markdown("**⚙️ Architecture**")
+                    st.markdown(t("experiment.architecture"))
                 with hcol2:
                     st.markdown(
                         '<span style="font-size:11px;font-weight:700;letter-spacing:0.5px;'
@@ -401,12 +405,12 @@ def render_experiment_view():
             run_action_placeholder = st.empty()
 
             # ── Adjust Parameters ──
-            with st.expander("☰ Adjust Parameters", expanded=False):
+            with st.expander(t("experiment.adjust_params"), expanded=False):
                 params = _render_param_controls(config.parameters)
 
             # ── Load Data ──
             with st.container(border=True):
-                st.markdown("**📁 Load Data**")
+                st.markdown(t("experiment.load_data"))
                 raw_df, source_type = _render_data_card(meta)
                 
             # ── Data Preparation ──
@@ -453,9 +457,9 @@ def render_experiment_view():
 
                 if X is not None:
                     if meta.task == "regression" and X.shape[1] > 1:
-                        system_msgs.append("Wielowymiarowa regresja: Do wizualizacji wyników użyto widoku 'Rzeczywiste vs Przewidywane' oraz redukcji wymiarów.")
+                        system_msgs.append(t("experiment.multidim_regression"))
                     elif meta.task == "classification" and X.shape[1] > 2:
-                        system_msgs.append("Problem wielowymiarowy: Aplikacja automatycznie użyła analizy główych składowych (PCA), aby wyświetlić podgląd danych w 2D.")
+                        system_msgs.append(t("experiment.multidim_classification"))
 
                 st.session_state["current_X"] = X
                 st.session_state["current_y"] = y
@@ -464,7 +468,7 @@ def render_experiment_view():
 
             # ── System Messages Inbox ──
             if system_msgs:
-                with st.expander(f"✉️ Komunikaty systemu ({len(system_msgs)})", expanded=False):
+                with st.expander(t("experiment.system_messages").format(count=len(system_msgs)), expanded=False):
                     for msg in system_msgs:
                         st.info(f"{msg}")
 
@@ -480,9 +484,9 @@ def render_experiment_view():
             # Executed after params and data are resolved, so no state lagging
             with run_action_placeholder.container():
                 if X is not None:
-                    st.caption(f"● Dane: **{X.shape[0]}** próbek, **{X.shape[1]}** cech")
-                
-                run_btn = st.button("▶ Run Model", type="primary", use_container_width=True, disabled=(X is None))
+                    st.caption(t("experiment.data_info").format(samples=X.shape[0], features=X.shape[1]))
+
+                run_btn = st.button(t("experiment.run_model"), type="primary", use_container_width=True, disabled=(X is None))
                 
                 if run_btn and X is not None:
                     st.session_state["model_ran"] = True
@@ -503,9 +507,9 @@ def render_experiment_view():
                 if run_X is not None:
                     r_col1, r_col2 = st.columns([3, 1])
                     with r_col1:
-                        st.markdown("### 📊 Wyniki")
+                        st.markdown(t("experiment.results"))
                     with r_col2:
-                        if st.button("💾 Zapisz Model", use_container_width=True):
+                        if st.button(t("experiment.save_model"), use_container_width=True):
                             from core.model_storage import save_model
                             try:
                                 save_model(
@@ -517,15 +521,15 @@ def render_experiment_view():
                                     target_name=st.session_state.get("last_run_target", "Target"),
                                     user_params=run_params
                                 )
-                                st.toast("✅ Model został zapisany pomyślnie!")
+                                st.toast(t("experiment.model_saved"))
                             except Exception as e:
-                                st.error(f"Nie udało się zapisać modelu: {e}")
+                                st.error(f"{t('experiment.save_failed')} {e}")
                     try:
                         render_results_panel(config, config.model_instance, run_X, run_y, run_params, run_features)
                     except Exception as e:
-                        st.error(f"⚠️ Błąd: {e}")
+                        st.error(f"{t('experiment.model_error')} {e}")
                 else:
-                    st.info("Kliknij **▶ Run Model** aby zobaczyć wyniki.")
+                    st.info(t("experiment.run_model_hint"))
             else:
                 current_X = st.session_state.get("current_X")
                 current_y = st.session_state.get("current_y")
@@ -533,22 +537,21 @@ def render_experiment_view():
                 
                 try:
                     render_empty_results_panel(
-                        config, 
-                        current_X, 
-                        current_y, 
+                        config,
+                        current_X,
+                        current_y,
                         current_features
                     )
                 except Exception as e:
-                    st.error(f"⚠️ Błąd renderowania widoku startowego: {e}")
+                    st.error(f"{t('experiment.render_error')} {e}")
 
     # ================================================================
     # TAB: History
     # ================================================================
     with tab_history:
-        st.markdown("#### 📜 Experiment History")
-        st.info("Historia eksperymentów będzie dostępna po uruchomieniu modelu. "
-                "Każde uruchomienie zapisze parametry, metryki i wyniki.")
-        st.caption("Coming soon in next release.")
+        st.markdown(t("experiment.history_header"))
+        st.info(t("experiment.history_info"))
+        st.caption(t("experiment.history_coming_soon"))
 
     # ================================================================
     # TAB: Settings
@@ -568,7 +571,7 @@ def _render_ai_suggestion(meta):
     tip = suggestions.get(meta.task, '"Adjust parameters and observe how metrics change."')
 
     with st.container(border=True):
-        st.markdown("**💡 AI Suggestion**")
+        st.markdown(t("experiment.ai_suggestion"))
         st.caption(tip)
 
 
@@ -582,23 +585,25 @@ def _render_data_card(meta):
     source_type = None
 
     # Source selector
+    _opt_csv = t("experiment.upload_csv")
+    _opt_sample = t("experiment.use_sample")
     csv_selected = st.radio(
         "source",
-        ["📄 Upload CSV file", "🧪 Use sample dataset"],
+        [_opt_csv, _opt_sample],
         horizontal=True,
         label_visibility="collapsed",
         key="data_source_radio",
         on_change=_reset_model_ran
     )
 
-    if csv_selected == "📄 Upload CSV file":
+    if csv_selected == _opt_csv:
         source_type = "csv"
         # Dropzone visual
-        st.markdown("""
+        st.markdown(f"""
         <div class="data-dropzone">
             <div class="data-dz-icon">☁️</div>
-            <div class="data-dz-title">Drag & Drop training data</div>
-            <div class="data-dz-sub">Supports .csv, .xlsx, and .json formats up to 50MB.</div>
+            <div class="data-dz-title">{t("experiment.drag_drop_title")}</div>
+            <div class="data-dz-sub">{t("experiment.drag_drop_sub")}</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -627,7 +632,7 @@ def _render_data_card(meta):
             unsafe_allow_html=True
         )
 
-    elif csv_selected == "🧪 Use sample dataset":
+    elif csv_selected == _opt_sample:
         source_type = "sample"
         from core.data_generators import generate_dataset
 
@@ -646,29 +651,29 @@ def _render_data_card(meta):
         n_outliers = 5
         if meta.task == "regression":
             trend_options = {
-                "📈 Trend dodatni (Liniowy)": "positive",
-                "📉 Trend ujemny (Liniowy)": "negative",
-                "🪃 Nieliniowy (Parabola)": "parabolic",
-                "🧲 Z elementami odstającymi": "outliers",
-                "☁️ Brak korelacji (Chmura)": "random"
+                t("experiment.trend_positive"): "positive",
+                t("experiment.trend_negative"): "negative",
+                t("experiment.trend_parabolic"): "parabolic",
+                t("experiment.trend_outliers"): "outliers",
+                t("experiment.trend_random"): "random"
             }
             sel_trend = st.selectbox(
-                "Kształt danych (trend)", 
+                t("experiment.data_trend_label"),
                 list(trend_options.keys()),
                 on_change=_reset_model_ran
             )
             trend_type = trend_options[sel_trend]
 
             if trend_type == "outliers":
-                n_outliers = st.slider("Liczba anomalii (0 = odcięcie)", 0, 20, 5, step=1, on_change=_reset_model_ran)
+                n_outliers = st.slider(t("experiment.n_anomalies"), 0, 20, 5, step=1, on_change=_reset_model_ran)
 
         sc1, sc2 = st.columns(2)
         with sc1:
-            n_samples = st.slider("Liczba próbek", 30, 500, 150, step=10, on_change=_reset_model_ran)
+            n_samples = st.slider(t("experiment.n_samples"), 30, 500, 150, step=10, on_change=_reset_model_ran)
         with sc2:
-            noise = st.slider("Poziom szumu", 0.01, 0.5, 0.15, step=0.01, on_change=_reset_model_ran)
+            noise = st.slider(t("experiment.noise_level"), 0.01, 0.5, 0.15, step=0.01, on_change=_reset_model_ran)
 
-        if st.button("🎲 Losuj nowe punkty", use_container_width=True, on_click=_reset_model_ran):
+        if st.button(t("experiment.random_points"), use_container_width=True, on_click=_reset_model_ran):
             st.session_state.data_seed += 1
 
         X, y, is_outlier = generate_dataset(
