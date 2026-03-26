@@ -442,6 +442,37 @@ def render_experiment_view():
 
     meta = config.metadata
 
+    # --- Global Top Header (Action Bar) ---
+    top_col1, top_col2 = st.columns([5, 1])
+    with top_col1:
+        st.markdown(f"## {meta.name} <span style='font-size:14px; font-weight:400; color:#888;'>({meta.model_class})</span>", unsafe_allow_html=True)
+    with top_col2:
+        if st.session_state.get("model_ran", False):
+            if st.button(t("experiment.btn_save_model").upper(), use_container_width=True, key="global_save_btn"):
+                from core.model_storage import save_model
+                try:
+                    save_model(
+                        name=meta.name,
+                        plugin_id=st.session_state.current_model_id,
+                        task=meta.task,
+                        model_instance=config.model_instance,
+                        feature_names=st.session_state.get("last_run_features", []),
+                        target_name=st.session_state.get("last_run_target", "Target"),
+                        user_params=st.session_state.get("last_run_params", {})
+                    )
+                    st.toast(f"✅ {t('experiment.save_success')}!")
+                except Exception as e:
+                    st.error(f"{t('experiment.save_error')}: {e}")
+
+    # --- Extract State at Top for Consistency ---
+    run_X = st.session_state.get("last_run_X")
+    run_y = st.session_state.get("last_run_y")
+    run_params = st.session_state.get("last_run_params", {})
+    run_features = st.session_state.get("last_run_features", [])
+    current_X = st.session_state.get("current_X")
+    current_y = st.session_state.get("current_y")
+    current_features = st.session_state.get("current_features", [])
+    model_ran = st.session_state.get("model_ran", False)
 
     # === TOP TABS ===
     tab_setup, tab_history, tab_settings = st.tabs([
@@ -463,12 +494,6 @@ def render_experiment_view():
 
         # ── TWO-COLUMN LAYOUT: 1/3 controls, 2/3 results ──
         col_ctrl, col_results = st.columns([1, 2], gap="large")
-
-        # Prep variables for both columns
-        run_X = st.session_state.get("last_run_X")
-        run_y = st.session_state.get("last_run_y")
-        run_params = st.session_state.get("last_run_params", {})
-        run_features = st.session_state.get("last_run_features", [])
 
         from components.visualization import (
             fit_model_instance, render_results_panel, render_empty_results_panel,
@@ -596,7 +621,7 @@ def render_experiment_view():
                 if X is not None:
                     st.caption(f"● Dane: **{X.shape[0]}** próbek, **{X.shape[1]}** cech")
                 
-                run_btn = st.button("▶ Run Model", type="primary", use_container_width=True, disabled=(X is None))
+                run_btn = st.button(t("experiment.btn_run_model"), type="primary", use_container_width=True, disabled=(X is None))
                 
                 if run_btn and X is not None:
                     st.session_state["model_ran"] = True
@@ -613,45 +638,29 @@ def render_experiment_view():
         # RIGHT COLUMN — Results Panel
         # ==============================================================
         with col_results:
-            if st.session_state.get("model_ran", False):
-                if run_X is not None:
-                    r_col1, r_col2 = st.columns([3, 1])
-                    with r_col1:
-                        st.markdown(f"### 📊 {t('experiment.results_header')}")
-                    with r_col2:
-                        if st.button(t("experiment.btn_save_model"), use_container_width=True):
-                            from core.model_storage import save_model
-                            try:
-                                save_model(
-                                    name=meta.name,
-                                    plugin_id=st.session_state.current_model_id,
-                                    task=meta.task,
-                                    model_instance=config.model_instance,
-                                    feature_names=run_features,
-                                    target_name=st.session_state.get("last_run_target", "Target"),
-                                    user_params=run_params
-                                )
-                                st.toast(f"✅ {t('experiment.save_success')}!")
-                            except Exception as e:
-                                st.error(f"{t('experiment.save_error')}: {e}")
-                    try:
-                        render_results_panel(config, config.model_instance, run_X, run_y, run_params, run_features)
-                    except Exception as e:
-                        st.error(f"⚠️ {t('generic.error')}: {e}")
-                else:
-                    st.markdown(f'<div class="ml-alert ml-alert-info"><span>▶️</span><div>{t("experiment.run_model_info")}</div></div>', unsafe_allow_html=True)
-            else:
-                current_X = st.session_state.get("current_X")
-                current_y = st.session_state.get("current_y")
-                current_features = st.session_state.get("current_features", [])
-                
+            # We fetch from session_state AGAIN here because it might have changed 
+            # in col_ctrl (e.g., clicking 'Use sample dataset')
+            latest_X = st.session_state.get("current_X")
+            latest_y = st.session_state.get("current_y")
+            latest_features = st.session_state.get("current_features", [])
+            latest_model_ran = st.session_state.get("model_ran", False)
+            
+            # Fetch latest run data as well
+            latest_run_X = st.session_state.get("last_run_X")
+            latest_run_y = st.session_state.get("last_run_y")
+            latest_run_params = st.session_state.get("last_run_params", {})
+            latest_run_features = st.session_state.get("last_run_features", [])
+
+            if latest_model_ran and latest_run_X is not None:
+                # Actual results
                 try:
-                    render_empty_results_panel(
-                        config, 
-                        current_X, 
-                        current_y, 
-                        current_features
-                    )
+                    render_results_panel(config, config.model_instance, latest_run_X, latest_run_y, latest_run_params, latest_run_features)
+                except Exception as e:
+                    st.error(f"⚠️ {t('generic.error')}: {e}")
+            else:
+                # Skeleton / Data Preview
+                try:
+                    render_empty_results_panel(config, latest_X, latest_y, latest_features)
                 except Exception as e:
                     st.error(f"⚠️ {t('experiment.render_error')}: {e}")
 

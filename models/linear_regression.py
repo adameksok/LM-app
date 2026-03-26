@@ -81,25 +81,6 @@ PYTANIA DO EKSPERYMENTU:
 3. Dlaczego MSE rośnie gdy linia nie pasuje do danych?
 
 ================================================================================
-WIZUALIZACJE
-================================================================================
-
-@visualization: regression_fit
-@viz_label: viz.scatter_plot
-@viz_show: true
-@viz_position: main
-
-@visualization: equation
-@viz_label: viz.learned_eq
-@viz_show: true
-@viz_position: top
-
-@visualization: data_table
-@viz_label: viz.data_set
-@viz_show: true
-@viz_position: bottom
-
-================================================================================
 """
 
 from sklearn.linear_model import LinearRegression
