@@ -318,8 +318,8 @@ DEFAULT_METRICS = {
 
 DEFAULT_VISUALIZATIONS = {
     "regression": [
-        VisualizationConfig("equation", "Wyuczone równanie", True, "top"),
-        VisualizationConfig("regression_fit", "Dopasowanie modelu", True, "main"),
+        VisualizationConfig("equation", "Learned Equation", True, "top"),
+        VisualizationConfig("regression_fit", "Model Fit", True, "main"),
     ],
     "classification": [
         VisualizationConfig("decision_boundary", "Decision Boundary", True, "main"),

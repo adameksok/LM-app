@@ -5,6 +5,7 @@ import datetime
 from core.plugin_engine import get_plugin_engine
 from core.plugin_interface import PluginConfig
 from core.model_storage import list_saved_models, delete_model
+from core.i18n import t, render_language_selector
 
 MODELS_DIR = Path(__file__).parent.parent / "models"
 
@@ -15,12 +16,8 @@ TASK_ICONS = {
     "dimensionality_reduction": "📊"
 }
 
-TASK_LABELS = {
-    "classification": "Klasyfikacja",
-    "regression": "Regresja",
-    "clustering": "Klasteryzacja",
-    "dimensionality_reduction": "Redukcja wymiarów"
-}
+def _task_label(task: str) -> str:
+    return t(f"dashboard.task.{task}") if t(f"dashboard.task.{task}") != f"dashboard.task.{task}" else task
 
 TASK_COLORS = {
     "classification": "#E65100",
@@ -188,10 +185,13 @@ def render_dashboard():
         st.success(st.session_state.install_success)
         del st.session_state.install_success
 
-    st.markdown("""
+    with st.sidebar:
+        render_language_selector()
+
+    st.markdown(f"""
         <div class="dash-header">
-            <div class="label">Your Models</div>
-            <h2>Analytical Library</h2>
+            <div class="label">{t("dashboard.your_models")}</div>
+            <h2>{t("dashboard.analytical_library")}</h2>
         </div>
     """, unsafe_allow_html=True)
 
@@ -212,16 +212,16 @@ def render_dashboard():
         _render_add_tile()
 
     st.markdown("<br><br>", unsafe_allow_html=True)
-    st.markdown("""
+    st.markdown(f"""
         <div class="dash-header">
-            <div class="label">Twoje Zapisane Analizy</div>
-            <h2>💾 Zapisane Modele i Walidacja</h2>
+            <div class="label">{t("dashboard.saved_analyses_label")}</div>
+            <h2>{t("dashboard.saved_models_header")}</h2>
         </div>
     """, unsafe_allow_html=True)
-    
+
     saved_models = list_saved_models()
     if not saved_models:
-        st.info("Nie zapisałeś jeszcze żadnego modelu. Wejdź w dowolny model, wgraj dane, wytrenuj i kliknij 'Zapisz Model'.")
+        st.info(t("dashboard.no_saved_models"))
     else:
         scols = st.columns(4, gap="medium")
         for i, sm_data in enumerate(saved_models):
@@ -236,7 +236,7 @@ def _render_tile(plugin_id: str, config: PluginConfig):
     task = meta.task
     color = TASK_COLORS.get(task, "#1565C0")
     icon = TASK_ICONS.get(task, "📊")
-    task_label = TASK_LABELS.get(task, task)
+    task_label = _task_label(task)
 
     # Light color variants
     bg_light = color + "18"  # 10% opacity hex
@@ -263,12 +263,12 @@ def _render_tile(plugin_id: str, config: PluginConfig):
 
     bcol1, bcol2 = st.columns([3, 1])
     with bcol1:
-        if st.button("Open →", key=f"btn_{plugin_id}", use_container_width=True):
+        if st.button(t("dashboard.open"), key=f"btn_{plugin_id}", use_container_width=True):
             st.session_state.current_view = "experiment"
             st.session_state.current_model_id = plugin_id
             st.rerun()
     with bcol2:
-        if st.button("🗑️", key=f"del_{plugin_id}", help="Disconnect plugin", use_container_width=True):
+        if st.button("🗑️", key=f"del_{plugin_id}", help=t("dashboard.disconnect_help"), use_container_width=True):
             plugin_file = MODELS_DIR / f"{plugin_id}.py"
             try:
                 if plugin_file.exists():
@@ -277,17 +277,17 @@ def _render_tile(plugin_id: str, config: PluginConfig):
                 st.session_state.plugin_uploader_key += 1
                 st.rerun()
             except Exception as e:
-                st.error(f"Cannot delete: {e}")
+                st.error(f"{t('dashboard.cannot_delete')} {e}")
 
 
 def _render_add_tile():
-    """Renders the 'Dodaj Model' tile with upload functionality."""
+    """Renders the 'Add Model' tile with upload functionality."""
 
-    add_html = """
+    add_html = f"""
     <div class="add-card">
         <div class="add-icon">＋</div>
-        <div class="add-title">Add Model</div>
-        <div class="add-subtitle">Upload .py file</div>
+        <div class="add-title">{t("dashboard.add_model_title")}</div>
+        <div class="add-subtitle">{t("dashboard.add_model_sub")}</div>
     </div>
     """
     st.markdown(add_html, unsafe_allow_html=True)
@@ -302,13 +302,13 @@ def _render_add_tile():
     if uploaded is not None:
         dest = MODELS_DIR / uploaded.name
         if dest.exists():
-            st.warning(f"⚠️ `{uploaded.name}` already istnieje — zostanie nadpisany.")
+            st.warning(f"⚠️ `{uploaded.name}` {t('dashboard.already_exists')}")
 
-        if st.button("Zainstaluj", key="btn_install", use_container_width=True):
+        if st.button(t("dashboard.install"), key="btn_install", use_container_width=True):
             dest.write_bytes(uploaded.getvalue())
             st.cache_resource.clear()
             st.session_state.plugin_uploader_key += 1
-            st.session_state.install_success = f"✅ Zainstalowano `{uploaded.name}`!"
+            st.session_state.install_success = f"✅ {t('dashboard.installed')} `{uploaded.name}`!"
             st.rerun()
 
 def _render_saved_tile(sm_data: dict):
@@ -316,8 +316,8 @@ def _render_saved_tile(sm_data: dict):
     name = sm_data["name"]
     task = sm_data["task"]
     created_at = sm_data["created_at"]
-    
-    date_str = datetime.datetime.fromtimestamp(created_at).strftime('Data: %d.%m.%Y, Time:%H:%M:%S')
+
+    date_str = datetime.datetime.fromtimestamp(created_at).strftime('%d.%m.%Y, %H:%M:%S')
     
     plugin_id = sm_data.get("plugin_id", "")
     is_linear = "linear" in plugin_id.lower() or "liniow" in name.lower()
@@ -327,11 +327,11 @@ def _render_saved_tile(sm_data: dict):
         
     color = TASK_COLORS.get(task, "#1565C0")
     icon = "📈" if is_linear else TASK_ICONS.get(task, "📊")
-    task_label = TASK_LABELS.get(task, task)
+    task_label = _task_label(task)
     bg_light = color + "18"
 
-    badge_html = f'<span class="card-badge" style="background:{bg_light}; color:{color};">ZAPISANY</span>'
-    desc = f"{date_str}<br>Cechy wejściowe: {len(sm_data.get('feature_names',[]))}"
+    badge_html = f'<span class="card-badge" style="background:{bg_light}; color:{color};">{t("dashboard.badge_saved")}</span>'
+    desc = f"{date_str}<br>{t('dashboard.input_features_count')} {len(sm_data.get('feature_names',[]))}"
 
     card_html = f"""
     <div class="model-card">
@@ -352,15 +352,15 @@ def _render_saved_tile(sm_data: dict):
 
     bcol1, bcol2 = st.columns([3, 1])
     with bcol1:
-        if st.button("Walidacja →", key=f"val_{model_id}", use_container_width=True):
+        if st.button(t("dashboard.validation"), key=f"val_{model_id}", use_container_width=True):
             st.session_state.current_view = "saved_model"
             st.session_state.current_saved_model_id = model_id
             st.rerun()
     with bcol2:
-        if st.button("🗑️", key=f"delsm_{model_id}", help="Usuń zapisany model", use_container_width=True):
+        if st.button("🗑️", key=f"delsm_{model_id}", help=t("dashboard.delete_saved_help"), use_container_width=True):
             try:
                 delete_model(model_id)
-                st.toast("Usunięto model")
+                st.toast(t("dashboard.delete_model_toast"))
                 st.rerun()
             except Exception as e:
-                st.error(f"Cannot delete: {e}")
+                st.error(f"{t('dashboard.cannot_delete')} {e}")
