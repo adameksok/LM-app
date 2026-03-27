@@ -806,11 +806,11 @@ def _render_data_card(meta):
 
         sc1, sc2 = st.columns(2)
         with sc1:
-            n_samples = st.slider(t("experiment.n_samples"), 30, 500, 150, step=10, on_change=_reset_data_state)
+            n_samples = st.slider(t("experiment.data_n_samples"), 30, 500, 150, step=10, on_change=_reset_data_state)
         with sc2:
-            noise = st.slider(t("experiment.noise_level"), 0.01, 0.5, 0.15, step=0.01, on_change=_reset_data_state)
+            noise = st.slider(t("experiment.data_noise_level"), 0.01, 0.5, 0.15, step=0.01, on_change=_reset_data_state)
 
-        if st.button(t("experiment.random_points"), use_container_width=True, on_click=_reset_data_state):
+        if st.button(t("experiment.data_random_points"), use_container_width=True, on_click=_reset_data_state):
             st.session_state.data_seed += 1
 
         X, y, is_outlier = generate_dataset(
