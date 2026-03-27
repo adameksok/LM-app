@@ -141,7 +141,7 @@ div[data-testid="stExpander"] {
     margin-bottom: 20px;
     overflow-x: auto;
     padding: 4px;
-    flex-wrap: nowrap;
+    flex-wrap: wrap; /* Changed from nowrap to allow wrapping if space permits */
 }
 .metric-card {
     background: white;
@@ -149,8 +149,8 @@ div[data-testid="stExpander"] {
     border-left: 4px solid #004b87;
     border-radius: 4px;
     padding: 10px 12px;
-    min-width: 140px;
-    flex: 1 1 0;
+    min-width: 120px; /* Further reduced to help fitting */
+    flex: 1 1 auto;   /* Growing based on content */
     box-shadow: 0 2px 4px rgba(0,0,0,0.02);
 }
 .metric-card-label {
