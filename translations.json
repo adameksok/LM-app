@@ -159,7 +159,8 @@
             "drag_drop_sub": "CSV, XLSX or JSON up to 10MB",
             "dropzone_title": "Choose a file or drag & drop",
             "dropzone_sub": "CSV, XLSX or JSON up to 10MB",
-            "browse_files": "Browse files"
+            "browse_files": "Browse files",
+            "render_error": "Render Error"
         }
     },
     "pl": {

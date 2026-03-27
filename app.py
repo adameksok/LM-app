@@ -133,6 +133,105 @@ div[data-testid="stExpander"] {
     .ml-alert-info { background: #ebf5ff; border-left: 5px solid #1976d2; color: #1a1a2e; }
     .ml-alert-warning { background: #fff9e6; border-left: 5px solid #ffa000; color: #1a1a2e; }
     .ml-alert-success { background: #eaf7ed; border-left: 5px solid #2e7d32; color: #1a1a2e; }
+
+/* ── Redesigned Metric Cards (Global) ── */
+.metric-card-container {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    overflow-x: auto;
+    padding: 4px;
+    flex-wrap: nowrap;
+}
+.metric-card {
+    background: white;
+    border: 1px solid #e8ecf0;
+    border-left: 4px solid #004b87;
+    border-radius: 4px;
+    padding: 10px 12px;
+    min-width: 140px;
+    flex: 1 1 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+.metric-card-label {
+    font-size: 10px;
+    font-weight: 800;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 8px;
+    white-space: nowrap;
+}
+.metric-card-value-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+.metric-card-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1a1a2e;
+}
+.metric-card-delta {
+    font-size: 12px;
+    font-weight: 600;
+}
+.metric-card-hint {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 6px;
+    line-height: 1.3;
+}
+/* Exception for Dark Style (Model Setup) */
+.metric-card-dark {
+    background: #004b87;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+.metric-card-dark .metric-card-label {
+    color: rgba(255, 255, 255, 0.7);
+}
+.metric-card-dark .metric-card-value {
+    color: white;
+}
+
+/* ── Training Button (Engine) ── */
+div.stButton > button {
+    background-color: #004b87 !important;
+    color: #FFD700 !important; /* Yellow */
+    border: none !important;
+    height: 60px !important; /* ~50% larger than default */
+    font-size: 18px !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+    transition: all 0.3s ease !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+div.stButton > button:hover {
+    background-color: #003366 !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;
+    transform: translateY(-2px) !important;
+}
+div.stButton > button:active {
+    transform: translateY(0px) !important;
+}
+
+/* ── Generic Header Bar ── */
+.eq-header-bar { 
+    background:#004b87; color:white; padding:8px 16px; border-radius:8px 8px 0 0; 
+    font-size:11px; font-weight:700; letter-spacing:1.2px; text-align:left; 
+    display:flex; align-items:center; gap:8px; margin-bottom: 0px; 
+}
+.eq-footer-row { 
+    display:flex; justify-content:space-between; color:#64748b; 
+    font-size:10px; font-family:monospace; text-transform:uppercase; 
+    letter-spacing:0.5px; margin-top: 10px; border-top: 1px solid #f1f5f9; padding-top: 8px;
+}
+/* Ensure KaTeX inside the widget is properly sized */
+.katex { font-size: 1.4em !important; }
 </style>
 """
 
@@ -502,39 +601,52 @@ def render_experiment_view():
         )
         
         # Ensure model is fitted before rendering either column for consistency
-        if st.session_state.get("model_ran", False) and run_X is not None:
-             fit_model_instance(config, config.model_instance, run_X, run_y, run_params)
+        try:
+            if st.session_state.get("model_ran", False) and run_X is not None:
+                 fit_model_instance(config, config.model_instance, run_X, run_y, run_params)
+        except Exception as e:
+            st.error(f"⚠️ {t('generic.error')}: {e}")
+            st.session_state["model_ran"] = False # Reset state if fit fails
 
         # ==============================================================
         # LEFT COLUMN — Control Panel
         # ==============================================================
         with col_ctrl:
             # ── Architecture (compact) ──
+            # ── Architecture (Modern Card Style) ──
+            st.markdown(f'<div class="eq-header-bar">⚡ {t("experiment.architecture").upper()}</div>', unsafe_allow_html=True)
             with st.container(border=True):
-                st.markdown(f"**{t('experiment.architecture')}**")
+                task_icons = {"classification": "🎯", "regression": "📈", "clustering": "🔄", "dimensionality_reduction": "📊"}
                 st.markdown(
-                    '<div style="margin-bottom: 15px;">'
-                    '<span style="font-size:11px;font-weight:700;letter-spacing:0.5px;'
-                    'padding:4px 10px;border-radius:20px;background:#E8F5E9;color:#2E7D32;">'
-                    f'{t("experiment.configured")}</span>'
+                    '<div style="margin-bottom: 12px; display: flex; align-items: center; gap: 10px;">'
+                    f'<strong>{meta.model_class}</strong> · {task_icons.get(meta.task, "📊")} {meta.task} '
+                    '<span style="font-size:10px;font-weight:700;letter-spacing:0.5px;'
+                    'padding:2px 8px;border-radius:12px;background:#E8F5E9;color:#2E7D32;margin-left:auto;">'
+                    f'{t("experiment.configured").upper()}</span>'
                     '</div>',
                     unsafe_allow_html=True
                 )
 
-                task_icons = {"classification": "🎯", "regression": "📈", "clustering": "🔄", "dimensionality_reduction": "📊"}
-                st.markdown(f"**{meta.model_class}** · {task_icons.get(meta.task, '📊')} {meta.task}")
-
-                # Param chips (compact row)
-                preview_params = visible_params[:3]
-                if preview_params:
-                    chip_cols = st.columns(len(preview_params))
-                    for i, p in enumerate(preview_params):
-                        with chip_cols[i]:
-                            label = p.name.upper().replace("_", " ")
-                            if len(label) > 10:
-                                label = label[:10]
-                            val = last_params.get(p.name, sklearn_params.get(p.name, p.default))
-                            st.metric(label=label, value=str(val))
+                # Param chips (Modern Cards Style - Exactly matching Quality Metrics anatomy)
+                if visible_params:
+                    param_cards_html = []
+                    for p in visible_params:
+                        label = p.name.upper().replace("_", " ")
+                        val = last_params.get(p.name, sklearn_params.get(p.name, p.default))
+                        
+                        # Formatting based on specs
+                        if isinstance(val, float) and val < 0.001:
+                            display_val = f"{val:.1e}"
+                        elif isinstance(val, (int, float)):
+                            display_val = f"{val}"
+                        else:
+                            display_val = str(val)
+                            
+                        # Single-line compact HTML with 'metric-card-dark' exception
+                        card = f'<div class="metric-card metric-card-dark"><div class="metric-card-label">{label}</div><div class="metric-card-value-row"><span class="metric-card-value" style="font-size: 20px;">{display_val}</span></div></div>'
+                        param_cards_html.append(card)
+                    
+                    st.markdown(f'<div class="metric-card-container" style="margin-top: 10px;">{"".join(param_cards_html)}</div>', unsafe_allow_html=True)
 
             # Placeholder for Run Model button (reserving visual space)
             run_action_placeholder = st.empty()
@@ -546,7 +658,11 @@ def render_experiment_view():
             # ── Load Data ──
             with st.container(border=True):
                 st.markdown(f"**{t('experiment.load_data')}**")
-                raw_df, source_type = _render_data_card(meta)
+                try:
+                    raw_df, source_type = _render_data_card(meta)
+                except Exception as e:
+                    st.error(f"⚠️ {t('experiment.data_load_error')}: {e}")
+                    raw_df, source_type = None, None
                 
             # ── Data Preparation ──
             X, y, feature_names = None, None, []
@@ -607,12 +723,10 @@ def render_experiment_view():
                     for msg in system_msgs:
                         st.markdown(f'<div class="ml-alert ml-alert-info"><span>💡</span><div>{msg}</div></div>', unsafe_allow_html=True)
 
-            # ── Model Attributes & Sidebar Visualizations (Left Column) ──
+            # ── Sidebar Visualizations (Left Column) ──
             if st.session_state.get("model_ran", False):
-                render_model_attributes_card(config, config.model_instance, run_features)
                 render_side_visualizations(config, config.model_instance, run_X, run_y, meta.task, run_features)
             else:
-                render_model_attributes_skeleton(config)
                 render_side_visualizations_skeleton(config, X_available=(X is not None))
 
             # ── Populate Run Model Button ──
@@ -621,7 +735,9 @@ def render_experiment_view():
                 if X is not None:
                     st.caption(f"● Dane: **{X.shape[0]}** próbek, **{X.shape[1]}** cech")
                 
-                run_btn = st.button(t("experiment.btn_run_model"), type="primary", use_container_width=True, disabled=(X is None))
+                # Updated label with engine icon
+                btn_label = f"⚙️ {t('experiment.btn_run_model').upper()}"
+                run_btn = st.button(btn_label, use_container_width=True, disabled=(X is None))
                 
                 if run_btn and X is not None:
                     st.session_state["model_ran"] = True
@@ -748,14 +864,22 @@ def _render_data_card(meta):
 
         if uploaded:
             ext = uploaded.name.split(".")[-1].lower()
-            if ext == "csv":
-                raw_df = pd.read_csv(uploaded)
-            elif ext in ("xlsx", "xls"):
-                raw_df = pd.read_excel(uploaded)
-            elif ext == "json":
-                raw_df = pd.read_json(uploaded)
-            else:
-                raw_df = pd.read_csv(uploaded)
+            try:
+                if ext == "csv":
+                    # Strategic fallback for different encodings (UTF-8, Latin-1, cp1250)
+                    try:
+                        raw_df = pd.read_csv(uploaded)
+                    except UnicodeDecodeError:
+                        raw_df = pd.read_csv(uploaded, encoding='cp1250') # Common for Polish Windows Excel
+                elif ext in ("xlsx", "xls"):
+                    raw_df = pd.read_excel(uploaded)
+                elif ext == "json":
+                    raw_df = pd.read_json(uploaded)
+                else:
+                    raw_df = pd.read_csv(uploaded)
+            except Exception as e:
+                st.error(f"❌ {t('experiment.file_parse_error')}: {e}")
+                raw_df = None
 
             # Removed redundant preview table from left column
 

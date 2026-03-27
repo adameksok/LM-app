@@ -159,7 +159,7 @@ WYJŚCIA MODELU — ATRYBUTY
 @output: coef_
 @output_label: Współczynniki (log-odds)
 @output_type: matrix
-@output_show: true
+@output_show: false
 @output_format: bar_chart
 @output_hint: Współczynniki w skali logarytmu szans (log-odds).
               
@@ -180,7 +180,7 @@ WYJŚCIA MODELU — ATRYBUTY
 @output: intercept_
 @output_label: Wyraz wolny (bias)
 @output_type: vector
-@output_show: true
+@output_show: false
 @output_format: text
 @output_hint: Bazowy log-odds gdy wszystkie cechy = 0.
               
@@ -192,7 +192,7 @@ WYJŚCIA MODELU — ATRYBUTY
 @output: classes_
 @output_label: Rozpoznawane klasy
 @output_type: labels
-@output_show: true
+@output_show: false
 @output_format: text
 @output_hint: Lista klas które model rozróżnia.
               Kolejność ma znaczenie — klasa 1 to ta "pozytywna" 
@@ -201,7 +201,7 @@ WYJŚCIA MODELU — ATRYBUTY
 @output: n_iter_
 @output_label: Liczba wykonanych iteracji
 @output_type: integer
-@output_show: true
+@output_show: false
 @output_format: text
 @output_hint: Ile iteracji optymalizacji wykonał model.
               

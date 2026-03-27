@@ -15,33 +15,8 @@ from core.model_outputs import get_model_outputs, calculate_metrics, build_equat
 from core.i18n_utils import t
 
 
-def _inject_equation_styles():
-    """Injects global CSS for the Learned Equation widget."""
-    st.markdown(f"""
-        <style>
-        .eq-header-bar {{ 
-            background:#004b87; color:white; padding:8px 16px; border-radius:8px 8px 0 0; 
-            font-size:11px; font-weight:700; letter-spacing:1.2px; text-align:left; 
-            display:flex; align-items:center; gap:8px; margin-bottom: 0px; 
-        }}
-        .eq-footer-row {{ 
-            display:flex; justify-content:space-between; color:#64748b; 
-            font-size:10px; font-family:monospace; text-transform:uppercase; 
-            letter-spacing:0.5px; margin-top: 10px; border-top: 1px solid #f1f5f9; padding-top: 8px;
-        }}
-        /* Bind header and the following container together by removing gap */
-        div[data-testid="stVerticalBlock"] > div:has(div.eq-header-bar) + div {{
-            margin-top: -16px !important;
-        }}
-        /* Ensure KaTeX inside the widget is properly sized */
-        .katex {{ font-size: 1.4em !important; }}
-        </style>
-    """, unsafe_allow_html=True)
-
-
 def render_data_preview(task: str, X: np.ndarray, y: Optional[np.ndarray], feature_names: List[str]):
     """Renders a scatter plot of the raw data before the model is run."""
-    _inject_equation_styles()
     fig = go.Figure()
 
     if task == "regression":
@@ -94,22 +69,31 @@ def fit_model_instance(config: PluginConfig, model, X, y, params):
     try:
         if params:
             model.set_params(**params)
-    except Exception:
-        pass
+    except Exception as e:
+        raise ValueError(f"Invalid parameters: {e}")
 
-    if task in ("dimensionality_reduction", "clustering"):
-        model.fit(X)
-    else:
-        model.fit(X, y)
+    try:
+        if task in ("dimensionality_reduction", "clustering"):
+            model.fit(X)
+        else:
+            if y is None:
+                raise ValueError("Target variable (y) is missing for this task.")
+            model.fit(X, y)
+    except Exception as e:
+        # Catch common sklearn errors and make them more readable
+        err_msg = str(e)
+        if "Unknown label type: 'continuous'" in err_msg:
+            raise ValueError("Data Type Mismatch: You are trying to fit a Classifier on continuous data. Please check your Target variable or Preprocessing (e.g., discretization).")
+        raise e
 
 
 def render_results_panel(config: PluginConfig, model, X, y, params, feature_names):
     """Main entry — renders the full results panel after model.fit()."""
     task = config.metadata.task
     
-    # Model should be fitted by fit_model_instance before this call for efficiency,
-    # but we ensure it here as well for backwards compatibility.
-    fit_model_instance(config, model, X, y, params)
+    # Model is fitted by app.py's calling logic, but we keep this here 
+    # as a safety check if needed, though app.py now handles the primary fit.
+    # fit_model_instance(config, model, X, y, params)
         
     # --- MAIN VISUALIZATIONS ---
     visible_vizs = [v for v in config.visualizations if v.show]
@@ -120,10 +104,16 @@ def render_results_panel(config: PluginConfig, model, X, y, params, feature_name
     for viz in main_vizs:
         _render_viz(viz, model, X, y, task, feature_names)
 
+    # --- DATAFRAME PREVIEW / TABLE (ALWAYS RENDER IF IN MAIN) ---
+    # In case data_table was specified as main, but handled with others
+    # Ensure it's not missed if it's the only one.
+    if any(v.name == "data_table" and v.position == "main" for v in visible_vizs):
+        dt_viz = [v for v in visible_vizs if v.name == "data_table"][0]
+        # Only render if not already rendered by the loop above (guard handled inside renderer)
+    
     # --- EQUATION ---
     eq_vizs = [v for v in visible_vizs if v.name == "equation" and v.position == "top"]
     if eq_vizs:
-        _inject_equation_styles()
         equation = build_equation(model, feature_names, task)
         if equation:
             # Extract raw values for footer
@@ -150,34 +140,58 @@ def render_results_panel(config: PluginConfig, model, X, y, params, feature_name
                 """, unsafe_allow_html=True)
 
 
-    # --- METRICS ---
-    # Metrics now full width under equation
+    # --- METRICS (REDESIGNED) ---
     metrics = calculate_metrics(model, X, y, task, config)
     if metrics:
-        with st.container(border=True):
-            st.markdown(f"**📈 {t('viz.quality_metrics')}**")
-            m_cols = st.columns(len(metrics))
-            for i, (mid, mdata) in enumerate(metrics.items()):
-                col = m_cols[i]
-                value = mdata['value']
-                label = mdata['label']
-                fmt = mdata['format']
-                good = mdata.get('good_value')
+        st.markdown(f'<div class="eq-header-bar">📈 {t("viz.quality_metrics").upper()}</div>', unsafe_allow_html=True)
+        
+        # We use a single container for all cards to keep layout clean
+        html_cards = []
+        for mid, mdata in metrics.items():
+            value = mdata['value']
+            label = mdata['label']
+            fmt = mdata['format']
+            good = mdata.get('good_value')
+            hint = mdata.get('hint', '')
 
-                if fmt == "percent":
-                    display_val = f"{value:.1%}"
-                elif fmt == "integer":
-                    display_val = str(int(value))
-                else:
-                    display_val = f"{value:.4e}"
+            if fmt == "percent":
+                display_val = f"{value:.1%}"
+            elif fmt == "integer":
+                display_val = str(int(value))
+            else:
+                display_val = f"{value:.4f}" # Use 4 decimals instead of scientific for better UI
 
-                delta = None
-                if good is not None and isinstance(value, (int, float)):
-                    delta = f"{'✅ good' if value >= good else '⚠️ low'}"
+            delta_html = ""
+            if good is not None:
+                is_good = value >= good
+                color = "#2e7d32" if is_good else "#d32f2f"
+                icon = "↑" if is_good else "↓"
+                delta_html = f'<span class="metric-card-delta" style="color:{color};">{icon} {t("dashboard.badge_ready") if is_good else "low"}</span>'
 
-                col.metric(label=label, value=display_val, delta=delta)
-                if mdata.get('hint'):
-                    col.caption(mdata['hint'][:120])
+            card = f'<div class="metric-card"><div class="metric-card-label">{label}</div><div class="metric-card-value-row"><span class="metric-card-value">{display_val}</span>{delta_html}</div><div class="metric-card-hint">{hint[:120]}</div></div>'
+            html_cards.append(card)
+        
+        st.markdown(f'<div class="metric-card-container">{"".join(html_cards)}</div>', unsafe_allow_html=True)
+
+    # --- DATAFRAME PREVIEW / TABLE (NOW UNDER METRICS) ---
+    st.markdown(f'<div class="eq-header-bar">📂 {t("viz.data_set").upper()}</div>', unsafe_allow_html=True)
+    with st.container(border=True):
+        df = pd.DataFrame(X, columns=feature_names)
+        
+        # Add Predictions for relevant tasks
+        if task in ("regression", "classification"):
+            try:
+                preds = model.predict(X)
+                pred_label = t("saved_model.prediction_column_prefix") if "saved_model.prediction_column_prefix" in t("saved_model.prediction_column_prefix") else "Prediction"
+                df[pred_label] = preds
+            except Exception:
+                pass
+
+        if y is not None:
+            target_name = st.session_state.get("last_run_target", "Target")
+            df[target_name] = y
+            
+        st.dataframe(df, use_container_width=True, key="main_results_data_table")
 
     # --- BOTTOM VISUALIZATIONS ---
     # Stacked vertically under metrics
@@ -595,7 +609,7 @@ def render_empty_results_panel(config: PluginConfig, X: Optional[np.ndarray], y:
     side_vizs = [v for v in visible_vizs if v.position == "side"]
     bottom_vizs = [v for v in visible_vizs if v.position == "bottom"]
 
-    _inject_equation_styles()
+
     
     # If X is provided and has data, show the actual data preview ONCE at the top
     if X is not None and X.size > 0:
@@ -683,7 +697,7 @@ def render_empty_results_panel(config: PluginConfig, X: Optional[np.ndarray], y:
 
     # --- MAIN VIZS ---
     if main_vizs and X is None:
-        _inject_equation_styles() # Need CSS for skeleton too
+
         for i, viz in enumerate(main_vizs):
             label_text = t(viz.label).upper()
             st.markdown(f'<div class="eq-header-bar">🖼️ {label_text} ({t("viz.waiting")})</div>', unsafe_allow_html=True)
@@ -695,7 +709,7 @@ def render_empty_results_panel(config: PluginConfig, X: Optional[np.ndarray], y:
     # --- EQUATION ---
     eq_vizs = [v for v in visible_vizs if v.name == "equation" and v.position == "top"]
     if eq_vizs:
-        _inject_equation_styles()
+
         # Header Bar (Always visible)
         st.markdown(f'<div class="eq-header-bar">📐 {t("viz.learned_eq").upper()}</div>', unsafe_allow_html=True)
 
@@ -714,16 +728,26 @@ def render_empty_results_panel(config: PluginConfig, X: Optional[np.ndarray], y:
                 </div>
             """, unsafe_allow_html=True)
 
-    # --- METRICS ---
+    # --- METRICS SKELETON (REDESIGNED) ---
     visible_metrics = [m for m in config.metrics if m.show]
     if visible_metrics:
-        with st.container(border=True, key="skeleton_metrics_container"):
-            st.markdown(f"**📈 {t('viz.quality_metrics')}**")
-            inner_cols = st.columns(len(visible_metrics))
-            for i, m in enumerate(visible_metrics):
-                inner_cols[i].metric(label=t(m.label), value="0.0000e+00" if m.format != "percent" else "0%")
-                if m.hint:
-                    inner_cols[i].caption(t(m.hint)[:100])
+        st.markdown(f'<div class="eq-header-bar">📈 {t("viz.quality_metrics").upper()}</div>', unsafe_allow_html=True)
+        html_cards = []
+        for m in visible_metrics:
+            hint = t(m.hint) if m.hint else ""
+            card = f'<div class="metric-card" style="opacity: 0.6;"><div class="metric-card-label">{t(m.label)}</div><div class="metric-card-value-row"><span class="metric-card-value" style="color:#e2e8f0;">0.0000</span></div><div class="metric-card-hint">{hint[:100]}</div></div>'
+            html_cards.append(card)
+        st.markdown(f'<div class="metric-card-container">{"".join(html_cards)}</div>', unsafe_allow_html=True)
+
+    # --- DATA TABLE SKELETON (UNDER METRICS) ---
+    if X is not None and X.size > 0:
+        st.markdown(f'<div class="eq-header-bar">📂 {t("viz.data_set").upper()}</div>', unsafe_allow_html=True)
+        with st.container(border=True):
+            df = pd.DataFrame(X, columns=feature_names)
+            if y is not None:
+                target_name = st.session_state.get("current_target", "Target")
+                df[target_name] = y
+            st.dataframe(df, use_container_width=True, key="skeleton_data_table_under_metrics")
 
     # --- BOTTOM VISUALIZATIONS ---
     # Stacked vertically

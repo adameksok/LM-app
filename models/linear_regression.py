@@ -81,6 +81,19 @@ PYTANIA DO EKSPERYMENTU:
 3. Dlaczego MSE rośnie gdy linia nie pasuje do danych?
 
 ================================================================================
+ATRYBUTY MODELU (ukryte)
+================================================================================
+
+@output: coef_
+@show: false
+
+@output: intercept_
+@show: false
+
+@output: n_features_in_
+@show: false
+
+================================================================================
 """
 
 from sklearn.linear_model import LinearRegression
