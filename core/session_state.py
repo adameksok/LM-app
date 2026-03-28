@@ -11,3 +11,7 @@ def init_session_state():
         st.session_state.lang = "en"
     if "saved_states" not in st.session_state:
         st.session_state.saved_states = []
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+    if "chat_initialized" not in st.session_state:
+        st.session_state.chat_initialized = False

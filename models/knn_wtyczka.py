@@ -65,6 +65,7 @@ PARAMETRY — WIDOCZNE DLA STUDENTA
 @type: select
 @options: Manhattan:1, Euklidesowa:2
 @default: 2
+@show: false
 @hint: W jaki sposób mierzona jest przestrzeń "od jednego punktu do drugiego".
        
        1 (Manhattan / Miejska):

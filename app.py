@@ -4,6 +4,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+from dotenv import load_dotenv
+load_dotenv()
 
 st.set_page_config(
     page_title="Edu-ML Sandbox",
@@ -141,7 +143,7 @@ div[data-testid="stExpander"] {
     margin-bottom: 20px;
     overflow-x: auto;
     padding: 4px;
-    flex-wrap: wrap; /* Changed from nowrap to allow wrapping if space permits */
+    flex-wrap: wrap;
 }
 .metric-card {
     background: white;
@@ -149,8 +151,8 @@ div[data-testid="stExpander"] {
     border-left: 4px solid #004b87;
     border-radius: 4px;
     padding: 10px 12px;
-    min-width: 120px; /* Further reduced to help fitting */
-    flex: 1 1 auto;   /* Growing based on content */
+    flex: 0 1 280px;
+    max-width: 280px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.02);
 }
 .metric-card-label {
@@ -188,6 +190,10 @@ div[data-testid="stExpander"] {
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: white;
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    
+    /* Fixed proportions for setup chips */
+    flex: 0 1 260px !important;
+    max-width: 260px !important;
 }
 .metric-card-dark .metric-card-label {
     color: rgba(255, 255, 255, 0.7);
@@ -316,6 +322,16 @@ def inject_custom_i18n_css():
 
 
 
+
+
+def _render_sidebar_minimal():
+    """Minimal sidebar shown in experiment view — branding only."""
+    st.markdown(f"""
+    <div class="sidebar-brand">
+        <h2>{t('sidebar.title')}</h2>
+        <div class="sub">{t('sidebar.subtitle')}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 def _render_sidebar_nav(meta):
@@ -516,31 +532,49 @@ def _render_settings_tab(config):
             st.warning("Cannot read source file.")
 
 
-def render_experiment_view():
-    st.markdown(APP_CSS, unsafe_allow_html=True)
+def _render_right_panel(config):
+    """Right panel: Navigation tab + AI Assistant tab."""
+    lang = st.session_state.get("lang", "en")
+    nav_label = "🧭 Nawigacja" if lang == "pl" else "🧭 Navigation"
+    chat_label = f"💬 {t('experiment.tab_assistant')}"
 
-    engine = get_plugin_engine()
-    config = engine.get_plugin(st.session_state.current_model_id)
+    panel_nav, panel_chat = st.tabs([nav_label, chat_label])
 
-    # Flush session state to prevent contamination when switching models
-    if st.session_state.get("_last_experiment_model_id") != st.session_state.current_model_id:
-        st.session_state["_last_experiment_model_id"] = st.session_state.current_model_id
-        st.session_state["model_ran"] = False
-        keys_to_clear = ["last_run_X", "last_run_y", "last_run_params", "last_run_features", "last_run_target",
-                         "current_X", "current_y", "current_features", "current_target"]
-        for k in keys_to_clear:
-            if k in st.session_state:
-                del st.session_state[k]
-
-    if not config:
-        st.error(t("experiment.plugin_not_found"))
-        if st.button(t("experiment.back_to_dashboard")):
-            st.session_state.page = "dashboard"
+    with panel_nav:
+        current_lang = st.session_state.get("lang", "en")
+        new_lang = st.selectbox(
+            t("sidebar.lang_selector"),
+            options=["en", "pl"],
+            index=0 if current_lang == "en" else 1,
+            key="rp_lang_selector"
+        )
+        if new_lang != current_lang:
+            st.session_state["lang"] = new_lang
             st.rerun()
-        return
 
-    meta = config.metadata
+        st.divider()
 
+        if st.button(t("sidebar.nav_models"), use_container_width=True, key="rp_btn_models"):
+            st.session_state.page = "dashboard"
+            st.cache_resource.clear()
+            st.rerun()
+
+        st.button(t("sidebar.nav_data"), use_container_width=True, disabled=True, key="rp_btn_data")
+        st.button(t("sidebar.nav_analysis"), use_container_width=True, disabled=True, key="rp_btn_analysis")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        if st.button(t("sidebar.new_experiment"), use_container_width=True, key="rp_btn_new_exp"):
+            st.session_state.page = "dashboard"
+            st.cache_resource.clear()
+            st.rerun()
+
+    with panel_chat:
+        from components.ai_chat_ui import render_ai_chat_tab
+        render_ai_chat_tab(config)
+
+
+def _render_experiment_main(config, meta):
     # --- Global Top Header (Action Bar) ---
     top_col1, top_col2 = st.columns([5, 1])
     with top_col1:
@@ -575,9 +609,9 @@ def render_experiment_view():
 
     # === TOP TABS ===
     tab_setup, tab_history, tab_settings = st.tabs([
-        f"⚡ {t('experiment.tab_setup')}", 
-        f"📜 {t('experiment.tab_history')}", 
-        f"⚙️ {t('experiment.tab_settings')}"
+        f"⚡ {t('experiment.tab_setup')}",
+        f"📜 {t('experiment.tab_history')}",
+        f"⚙️ {t('experiment.tab_settings')}",
     ])
 
     # ================================================================
@@ -599,7 +633,7 @@ def render_experiment_view():
             render_model_attributes_card, render_model_attributes_skeleton,
             render_side_visualizations, render_side_visualizations_skeleton
         )
-        
+
         # Ensure model is fitted before rendering either column for consistency
         try:
             if st.session_state.get("model_ran", False) and run_X is not None:
@@ -631,9 +665,9 @@ def render_experiment_view():
                 if visible_params:
                     param_cards_html = []
                     for p in visible_params:
-                        label = p.name.upper().replace("_", " ")
+                        label = p.label.upper() if p.label else p.name.upper().replace("_", " ")
                         val = last_params.get(p.name, sklearn_params.get(p.name, p.default))
-                        
+
                         # Formatting based on specs
                         if isinstance(val, float) and val < 0.001:
                             display_val = f"{val:.1e}"
@@ -641,11 +675,11 @@ def render_experiment_view():
                             display_val = f"{val}"
                         else:
                             display_val = str(val)
-                            
+
                         # Single-line compact HTML with 'metric-card-dark' exception
-                        card = f'<div class="metric-card metric-card-dark"><div class="metric-card-label">{label}</div><div class="metric-card-value-row"><span class="metric-card-value" style="font-size: 20px;">{display_val}</span></div></div>'
+                        card = f'<div class="metric-card"><div class="metric-card-label">{label}</div><div class="metric-card-value-row"><span class="metric-card-value" style="font-size: 20px;">{display_val}</span></div></div>'
                         param_cards_html.append(card)
-                    
+
                     st.markdown(f'<div class="metric-card-container" style="margin-top: 10px;">{"".join(param_cards_html)}</div>', unsafe_allow_html=True)
 
             # Placeholder for Run Model button (reserving visual space)
@@ -663,18 +697,18 @@ def render_experiment_view():
                 except Exception as e:
                     st.error(f"⚠️ {t('experiment.data_load_error')}: {e}")
                     raw_df, source_type = None, None
-                
+
             # ── Data Preparation ──
             X, y, feature_names = None, None, []
             system_msgs = []
             current_target = "Target"
-            
+
             if raw_df is not None:
                 if source_type == "csv":
                     from components.data_prep_ui import render_preprocessing_card
                     clean_df, target_col, prep_msgs = render_preprocessing_card(raw_df, meta.task)
                     system_msgs.extend(prep_msgs)
-                    
+
                     if not clean_df.empty:
                         if target_col and target_col in clean_df.columns:
                             y = clean_df[target_col].values
@@ -683,7 +717,6 @@ def render_experiment_view():
                         else:
                             y = None
                             feat_df = clean_df
-                            
                         X = feat_df.values
                         feature_names = feat_df.columns.tolist()
                 else:
@@ -695,13 +728,13 @@ def render_experiment_view():
                         current_target = 'Target'
                     else:
                         y = None
-                        
+
                     if '_IsOutlier' in raw_df.columns:
                         st.session_state["current_outliers"] = raw_df['_IsOutlier'].values
                         cols_to_drop.append('_IsOutlier')
                     else:
                         st.session_state["current_outliers"] = None
-                        
+
                     feat_df = raw_df.drop(columns=cols_to_drop)
                     X = feat_df.values
                     feature_names = feat_df.columns.tolist()
@@ -734,11 +767,11 @@ def render_experiment_view():
             with run_action_placeholder.container():
                 if X is not None:
                     st.caption(f"● Dane: **{X.shape[0]}** próbek, **{X.shape[1]}** cech")
-                
+
                 # Updated label with engine icon
                 btn_label = f"⚙️ {t('experiment.btn_run_model').upper()}"
                 run_btn = st.button(btn_label, use_container_width=True, disabled=(X is None))
-                
+
                 if run_btn and X is not None:
                     st.session_state["model_ran"] = True
                     if not params:
@@ -754,13 +787,13 @@ def render_experiment_view():
         # RIGHT COLUMN — Results Panel
         # ==============================================================
         with col_results:
-            # We fetch from session_state AGAIN here because it might have changed 
+            # We fetch from session_state AGAIN here because it might have changed
             # in col_ctrl (e.g., clicking 'Use sample dataset')
             latest_X = st.session_state.get("current_X")
             latest_y = st.session_state.get("current_y")
             latest_features = st.session_state.get("current_features", [])
             latest_model_ran = st.session_state.get("model_ran", False)
-            
+
             # Fetch latest run data as well
             latest_run_X = st.session_state.get("last_run_X")
             latest_run_y = st.session_state.get("last_run_y")
@@ -793,6 +826,44 @@ def render_experiment_view():
     # ================================================================
     with tab_settings:
         _render_settings_tab(config)
+
+
+def render_experiment_view():
+    st.markdown(APP_CSS, unsafe_allow_html=True)
+
+    engine = get_plugin_engine()
+    config = engine.get_plugin(st.session_state.current_model_id)
+
+    # Flush session state to prevent contamination when switching models
+    if st.session_state.get("_last_experiment_model_id") != st.session_state.current_model_id:
+        st.session_state["_last_experiment_model_id"] = st.session_state.current_model_id
+        st.session_state["model_ran"] = False
+        keys_to_clear = ["last_run_X", "last_run_y", "last_run_params", "last_run_features", "last_run_target",
+                         "current_X", "current_y", "current_features", "current_target"]
+        for k in keys_to_clear:
+            if k in st.session_state:
+                del st.session_state[k]
+        # Reset chat when switching models
+        st.session_state["chat_history"] = []
+        st.session_state["chat_initialized"] = False
+
+    # Reset chat when user switches language
+    current_lang = st.session_state.get("lang", "en")
+    if st.session_state.get("_last_chat_lang") != current_lang:
+        st.session_state["_last_chat_lang"] = current_lang
+        st.session_state["chat_history"] = []
+        st.session_state["chat_initialized"] = False
+
+    if not config:
+        st.error(t("experiment.plugin_not_found"))
+        if st.button(t("experiment.back_to_dashboard")):
+            st.session_state.page = "dashboard"
+            st.rerun()
+        return
+
+    meta = config.metadata
+
+    _render_experiment_main(config, meta)
 
 
 def _render_ai_suggestion(meta):
@@ -977,7 +1048,12 @@ def main():
             
     # Always render sidebar
     with st.sidebar:
-        _render_sidebar_nav(meta)
+        if page == "experiment" and config:
+            _render_sidebar_minimal()
+            st.divider()
+            _render_right_panel(config)
+        else:
+            _render_sidebar_nav(meta)
 
     # Main view routing
     if page == "dashboard":

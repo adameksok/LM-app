@@ -33,26 +33,35 @@ def _inject_dashboard_css():
     <style>
     /* ── Dashboard header ── */
     .dash-header {
-        padding: 0 0 8px 0;
+        background: #004b87;
+        color: white;
+        padding: 10px 16px;
+        border-radius: 8px 8px 0 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        margin-bottom: 20px;
     }
     .dash-header .label {
-        font-size: 11px;
+        font-size: 10px;
         text-transform: uppercase;
-        letter-spacing: 1.5px;
-        color: #888;
+        letter-spacing: 1.2px;
+        color: rgba(255,255,255,0.7);
+        font-weight: 700;
         margin-bottom: 2px;
     }
     .dash-header h2 {
         margin: 0;
-        font-size: 22px;
+        font-size: 18px;
         font-weight: 700;
-        color: #1A1A2E;
+        color: white;
     }
 
     /* ── Model card ── */
     .model-card {
         background: #fff;
         border: 1px solid #E8ECF0;
+        border-left: 5px solid #004b87;
         border-radius: 12px;
         padding: 20px;
         min-height: 200px;
@@ -126,7 +135,7 @@ def _inject_dashboard_css():
 
     /* ── Add-model card ── */
     .add-card {
-        background: linear-gradient(135deg, #1976D2, #1565C0);
+        background: #1a1a2e;
         border: none;
         border-radius: 12px;
         padding: 24px;
@@ -200,14 +209,15 @@ def render_dashboard():
     all_items = list(plugins.items())
     cols = st.columns(4, gap="medium")
 
-    for i, (plugin_id, config) in enumerate(all_items):
-        with cols[i % 4]:
-            _render_tile(plugin_id, config)
-
-    # "Dodaj Model" tile in next available column
-    add_col_idx = len(all_items) % 4
-    with cols[add_col_idx]:
+    # "Dodaj Model" tile - always first from the left
+    with cols[0]:
         _render_add_tile()
+
+    # Model tiles starting from the second column
+    for i, (plugin_id, config) in enumerate(all_items):
+        col_idx = (i + 1) % 4
+        with cols[col_idx]:
+            _render_tile(plugin_id, config)
 
     st.markdown("<br><br>", unsafe_allow_html=True)
     st.markdown(f"""

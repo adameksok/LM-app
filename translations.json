@@ -150,6 +150,7 @@
             "tab_setup": "Model Setup",
             "tab_history": "History",
             "tab_settings": "Settings",
+            "tab_assistant": "Assistant",
             "configured": "Configured",
             "data_source_upload": "📄 Upload CSV file",
             "upload_csv": "Upload CSV file",
@@ -161,6 +162,17 @@
             "dropzone_sub": "CSV, XLSX or JSON up to 10MB",
             "browse_files": "Browse files",
             "render_error": "Render Error"
+        },
+        "assistant": {
+            "input_placeholder": "Ask a question about the model...",
+            "clear_history": "🗑 Clear history",
+            "clear_confirm": "Chat history cleared.",
+            "no_api_key": "GEMINI_API_KEY is missing. Add it to your .env file and restart the app.",
+            "model_not_trained_banner": "Run the model (▶ Run Model) so the assistant can see your results.",
+            "thinking": "Assistant is thinking...",
+            "error_timeout": "Request timed out. Please try again.",
+            "error_quota": "Gemini API quota reached. Try again shortly.",
+            "error_generic": "An error occurred communicating with the assistant."
         }
     },
     "pl": {
@@ -320,6 +332,7 @@
             "tab_setup": "Ustawienia Modelu",
             "tab_history": "Historia",
             "tab_settings": "Ustawienia",
+            "tab_assistant": "Asystent",
             "configured": "Skonfigurowano",
             "data_source_upload": "📄 Wgraj plik CSV",
             "upload_csv": "Wgraj plik CSV",
@@ -330,6 +343,17 @@
             "dropzone_title": "Wybierz plik lub przeciągnij i upuść",
             "dropzone_sub": "CSV, XLSX lub JSON do 10MB",
             "browse_files": "Szukaj plików"
+        },
+        "assistant": {
+            "input_placeholder": "Zadaj pytanie o model...",
+            "clear_history": "🗑 Wyczyść historię",
+            "clear_confirm": "Historia czatu wyczyszczona.",
+            "no_api_key": "Brak klucza GEMINI_API_KEY. Dodaj go do pliku .env i uruchom ponownie aplikację.",
+            "model_not_trained_banner": "Uruchom model (▶ Run Model), aby asystent widział Twoje wyniki.",
+            "thinking": "Asystent analizuje...",
+            "error_timeout": "Przekroczono czas oczekiwania. Spróbuj ponownie.",
+            "error_quota": "Osiągnięto limit API Gemini. Spróbuj za chwilę.",
+            "error_generic": "Wystąpił błąd komunikacji z asystentem."
         }
     }
 }
