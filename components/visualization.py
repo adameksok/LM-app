@@ -795,7 +795,7 @@ def render_side_visualizations_skeleton(config: PluginConfig, X_available: bool)
         return
         
     placeholder_fig = go.Figure()
-    text = "Wczytaj dane podgląd..." if not X_available else "Kliknij 'Run Model'..."
+    text = t("viz.load_data_hint") if not X_available else t("viz.run_model_hint")
     placeholder_fig.update_layout(
         template='plotly_white',
         xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
