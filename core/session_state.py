@@ -15,3 +15,5 @@ def init_session_state():
         st.session_state.chat_history = []
     if "chat_initialized" not in st.session_state:
         st.session_state.chat_initialized = False
+    if "authenticated" not in st.session_state:
+        st.session_state.authenticated = False

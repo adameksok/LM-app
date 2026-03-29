@@ -135,8 +135,8 @@ def _inject_dashboard_css():
 
     /* ── Add-model card ── */
     .add-card {
-        background: #1a1a2e;
-        border: none;
+        background: #e9f2f9; /* Updated bg color */
+        border: 2px dashed #004b87; /* Added dashed border for better visibility */
         border-radius: 12px;
         padding: 24px;
         min-height: 200px;
@@ -148,29 +148,29 @@ def _inject_dashboard_css():
         transition: box-shadow 0.2s, transform 0.15s;
     }
     .add-card:hover {
-        box-shadow: 0 8px 28px rgba(25,118,210,0.3);
+        box-shadow: 0 8px 28px rgba(0, 75, 135, 0.15);
         transform: translateY(-2px);
     }
     .add-icon {
         width: 48px;
         height: 48px;
-        border: 2px solid rgba(255,255,255,0.5);
+        border: 2px solid #004b87; /* Dark icon border */
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 28px;
-        color: #fff;
+        color: #004b87; /* Dark icon color */
         margin-bottom: 12px;
     }
     .add-title {
         font-size: 16px;
         font-weight: 700;
-        color: #fff;
+        color: #1a1a2e; /* Dark title for contrast */
     }
     .add-subtitle {
         font-size: 12px;
-        color: rgba(255,255,255,0.7);
+        color: #666; /* Dark subtitle for contrast */
         margin-top: 4px;
     }
 

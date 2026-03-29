@@ -131,7 +131,7 @@
             "error_file_analysis": "Error during file analysis"
         },
         "experiment": {
-            "architecture": "⚡ Model Setup & Architecture",
+            "architecture": "Model Setup & Architecture",
             "adjust_params": "⚙️ Adjust Parameters",
             "load_data": "📁 Load Data",
             "results_header": "Results",
@@ -145,6 +145,11 @@
             "data_n_samples": "Number of samples",
             "data_noise_level": "Noise level",
             "data_random_points": "🎲 Randomize points",
+            "trend_positive": "📈 Positive Trend (Linear)",
+            "trend_negative": "📉 Negative Trend (Linear)",
+            "trend_parabolic": "🪃 Non-linear (Parabola)",
+            "trend_outliers": "🧲 With Outliers",
+            "trend_random": "☁️ No Correlation (Random Cloud)",
             "btn_save_model": "💾 Save Model",
             "btn_run_model": "▶ Run Model",
             "tab_setup": "Model Setup",
@@ -158,10 +163,7 @@
             "data_source_sample": "🧪 Use sample dataset",
             "drag_drop_title": "Choose a file or drag & drop",
             "drag_drop_sub": "CSV, XLSX or JSON up to 10MB",
-            "dropzone_title": "Choose a file or drag & drop",
-            "dropzone_sub": "CSV, XLSX or JSON up to 10MB",
-            "browse_files": "Browse files",
-            "render_error": "Render Error"
+            "browse_files": "Browse files"
         },
         "assistant": {
             "input_placeholder": "Ask a question about the model...",
@@ -313,7 +315,7 @@
             "error_file_analysis": "Błąd podczas analizy pliku"
         },
         "experiment": {
-            "architecture": "⚡ Architektura i konfiguracja modelu",
+            "architecture": "Architektura i konfiguracja modelu",
             "adjust_params": "⚙️ Dostosuj Parametry",
             "load_data": "📁 Załaduj Dane",
             "results_header": "Wyniki",
@@ -327,6 +329,11 @@
             "data_n_samples": "Liczba próbek",
             "data_noise_level": "Poziom szumu",
             "data_random_points": "🎲 Losuj nowe punkty",
+            "trend_positive": "📈 Trend dodatni (Liniowy)",
+            "trend_negative": "📉 Trend ujemny (Liniowy)",
+            "trend_parabolic": "🪃 Nieliniowy (Parabola)",
+            "trend_outliers": "🧲 Z elementami odstającymi",
+            "trend_random": "☁️ Brak korelacji (Chmura)",
             "btn_save_model": "💾 Zapisz Model",
             "btn_run_model": "▶ Uruchom Model",
             "tab_setup": "Ustawienia Modelu",
@@ -339,9 +346,7 @@
             "use_sample": "Użyj przykładowego zbioru",
             "data_source_sample": "🧪 Użyj przykładowego zbioru",
             "drag_drop_title": "Wybierz plik lub przeciągnij i upuść",
-            "drag_drop_sub": "CSV, XLSX lub JSON do 10MB",
-            "dropzone_title": "Wybierz plik lub przeciągnij i upuść",
-            "dropzone_sub": "CSV, XLSX lub JSON do 10MB",
+            "drag_drop_sub": "Wszystkie formaty (CSV, XLSX, JSON)",
             "browse_files": "Szukaj plików"
         },
         "assistant": {

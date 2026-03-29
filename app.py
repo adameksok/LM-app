@@ -4,11 +4,12 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import hashlib
 from dotenv import load_dotenv
 load_dotenv()
 
 st.set_page_config(
-    page_title="Edu-ML Sandbox",
+    page_title="ScikitVision",
     page_icon="🧪",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -151,8 +152,8 @@ div[data-testid="stExpander"] {
     border-left: 4px solid #004b87;
     border-radius: 4px;
     padding: 10px 12px;
-    flex: 0 1 280px;
-    max-width: 280px;
+    flex: 1 1 140px; /* Reduced basis to allow cards to share rows more easily */
+    max-width: 320px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.02);
 }
 .metric-card-label {
@@ -163,6 +164,8 @@ div[data-testid="stExpander"] {
     letter-spacing: 0.8px;
     margin-bottom: 8px;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .metric-card-value-row {
     display: flex;
@@ -225,6 +228,32 @@ div.stButton > button:active {
     transform: translateY(0px) !important;
 }
 
+/* ── Login Section ── */
+.login-container {
+    max-width: 400px;
+    margin: 100px auto;
+    padding: 40px;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+    border: 1px solid #E8ECF0;
+}
+.login-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+.login-header h1 {
+    font-size: 24px;
+    font-weight: 800;
+    color: #1A1A2E;
+    margin: 0;
+}
+.login-header p {
+    font-size: 14px;
+    color: #666;
+    margin-top: 8px;
+}
+
 /* ── Generic Header Bar ── */
 .eq-header-bar { 
     background:#004b87; color:white; padding:8px 16px; border-radius:8px 8px 0 0; 
@@ -238,6 +267,11 @@ div.stButton > button:active {
 }
 /* Ensure KaTeX inside the widget is properly sized */
 .katex { font-size: 1.4em !important; }
+
+/* Hide expander arrow globally */
+[data-testid="stExpander"] svg {
+    display: none !important;
+}
 </style>
 """
 
@@ -326,23 +360,30 @@ def inject_custom_i18n_css():
 
 def _render_sidebar_minimal():
     """Minimal sidebar shown in experiment view — branding only."""
-    st.markdown(f"""
-    <div class="sidebar-brand">
-        <h2>{t('sidebar.title')}</h2>
-        <div class="sub">{t('sidebar.subtitle')}</div>
-    </div>
-    """, unsafe_allow_html=True)
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        st.image("static/logoSV.png", width=40)
+    with col2:
+        st.markdown(f"""
+        <div class="sidebar-brand">
+            <h2 style="margin-top: -5px;">ScikitVision</h2>
+            <div class="sub">{t('sidebar.subtitle')}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 def _render_sidebar_nav(meta):
     """Sidebar: branding + navigation + actions."""
-
-    st.markdown(f"""
-    <div class="sidebar-brand">
-        <h2>{t('sidebar.title')}</h2>
-        <div class="sub">{t('sidebar.subtitle')}</div>
-    </div>
-    """, unsafe_allow_html=True)
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        st.image("static/logoSV.png", width=40)
+    with col2:
+        st.markdown(f"""
+        <div class="sidebar-brand">
+            <h2 style="margin-top: -5px;">ScikitVision</h2>
+            <div class="sub">{t('sidebar.subtitle')}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.divider()
 
@@ -648,17 +689,28 @@ def _render_experiment_main(config, meta):
         with col_ctrl:
             # ── Architecture (compact) ──
             # ── Architecture (Modern Card Style) ──
-            st.markdown(f'<div class="eq-header-bar">⚡ {t("experiment.architecture").upper()}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="eq-header-bar">{t("experiment.architecture").upper()}</div>', unsafe_allow_html=True)
             with st.container(border=True):
                 task_icons = {"classification": "🎯", "regression": "📈", "clustering": "🔄", "dimensionality_reduction": "📊"}
-                st.markdown(
-                    '<div style="margin-bottom: 12px; display: flex; align-items: center; gap: 10px;">'
-                    f'<strong>{meta.model_class}</strong> · {task_icons.get(meta.task, "📊")} {meta.task} '
-                    '<span style="font-size:10px;font-weight:700;letter-spacing:0.5px;'
-                    'padding:2px 8px;border-radius:12px;background:#E8F5E9;color:#2E7D32;margin-left:auto;">'
-                    f'{t("experiment.configured").upper()}</span>'
-                    '</div>',
-                    unsafe_allow_html=True
+                st.html(
+                    f"""
+<div style="position: relative; margin-bottom: 20px; padding-top: 5px;">
+    <div style="position: absolute; top: -5px; right: 0; font-size: 24px; opacity: 0.8;">
+        {task_icons.get(meta.task, "📊")}
+    </div>
+    <div style="font-size: 18px; font-weight: 700; color: #1a1a2e; margin-bottom: 4px;">
+        {meta.model_class}
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 13px; color: #64748b; text-transform: capitalize;">{meta.task}</span>
+        <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+                   padding: 2px 8px; border-radius: 12px; background: #E8F5E9;
+                   color: #2E7D32;">
+            {t("experiment.configured").upper()}
+        </span>
+    </div>
+</div>
+"""
                 )
 
                 # Param chips (Modern Cards Style - Exactly matching Quality Metrics anatomy)
@@ -676,17 +728,17 @@ def _render_experiment_main(config, meta):
                         else:
                             display_val = str(val)
 
-                        # Single-line compact HTML with 'metric-card-dark' exception
-                        card = f'<div class="metric-card"><div class="metric-card-label">{label}</div><div class="metric-card-value-row"><span class="metric-card-value" style="font-size: 20px;">{display_val}</span></div></div>'
+                        # Single-line compact HTML
+                        card = f'<div class="metric-card" style="flex: 1 1 0px; min-width: 100px; overflow: hidden;"><div class="metric-card-label" title="{label}">{label}</div><div class="metric-card-value-row"><span class="metric-card-value" style="font-size: 18px;">{display_val}</span></div></div>'
                         param_cards_html.append(card)
 
-                    st.markdown(f'<div class="metric-card-container" style="margin-top: 10px;">{"".join(param_cards_html)}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="metric-card-container" style="margin-top: 10px; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 8px;">{"".join(param_cards_html)}</div>', unsafe_allow_html=True)
 
             # Placeholder for Run Model button (reserving visual space)
             run_action_placeholder = st.empty()
 
             # ── Adjust Parameters ──
-            with st.expander(f"☰ {t('experiment.adjust_params')}", expanded=False):
+            with st.expander(t('experiment.adjust_params'), expanded=False):
                 params = _render_param_controls(config.parameters)
 
             # ── Load Data ──
@@ -983,11 +1035,11 @@ def _render_data_card(meta):
         n_outliers = 5
         if meta.task == "regression":
             trend_options = {
-                "📈 Trend dodatni (Liniowy)": "positive",
-                "📉 Trend ujemny (Liniowy)": "negative",
-                "🪃 Nieliniowy (Parabola)": "parabolic",
-                "🧲 Z elementami odstającymi": "outliers",
-                "☁️ Brak korelacji (Chmura)": "random"
+                t("experiment.trend_positive"): "positive",
+                t("experiment.trend_negative"): "negative",
+                t("experiment.trend_parabolic"): "parabolic",
+                t("experiment.trend_outliers"): "outliers",
+                t("experiment.trend_random"): "random"
             }
             sel_trend = st.selectbox(
                 t("experiment.data_trend_label"), 
@@ -997,7 +1049,7 @@ def _render_data_card(meta):
             trend_type = trend_options[sel_trend]
 
             if trend_type == "outliers":
-                n_outliers = st.slider(t("experiment.data_outliers_label"), 0, 20, 5, step=1, on_change=_reset_model_ran)
+                n_outliers = st.slider(t("experiment.data_outliers_label"), 0, 20, 5, step=1, on_change=_reset_data_state)
 
         sc1, sc2 = st.columns(2)
         with sc1:
@@ -1031,17 +1083,54 @@ def _render_data_card(meta):
 
     return raw_df, source_type
 
+# ── Authentication View ──
+def render_login_view():
+    st.markdown("""
+        <div class="login-container" style="text-align: center;">
+            <div class="login-header">
+                <img src="app/static/logoSV.png" width="80" style="margin-bottom: 20px;">
+                <h1>ScikitVision</h1>
+                <p>Please sign in to access the platform</p>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Correct password hash for '&)30project'
+    # Generated via: hashlib.sha256('&)30project'.encode()).hexdigest()
+    TARGET_USER = "project"
+    TARGET_HASH = "fc0d46c71149d9a9fe23780f5c5dde5789d04062d45aa0abb576bb1234979673"
+
+    with st.container():
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            user_input = st.text_input("Username", key="login_user", placeholder="Enter username")
+            pass_input = st.text_input("Password", type="password", key="login_pass", placeholder="Enter password")
+            
+            if st.button("SIGN IN", use_container_width=True):
+                input_hash = hashlib.sha256(pass_input.encode()).hexdigest()
+                if user_input == TARGET_USER and input_hash == TARGET_HASH:
+                    st.session_state.authenticated = True
+                    st.rerun()
+                else:
+                    st.error("Invalid credentials. Please try again.")
+
 def main():
     init_session_state()
-    load_translations()
     inject_custom_i18n_css()
+    
+    # 1. Check Authentication First
+    if not st.session_state.authenticated:
+        render_login_view()
+        return
 
-    # Get metadata for sidebar if in experiment view
-    meta = None
+    # 2. Proceed with App if Authenticated
+    engine = get_plugin_engine()
+    # Fixed method name from get_all_plugins_metadata to discover_plugins
+    meta = engine._plugins_cache 
     page = st.session_state.get("page", "dashboard")
+    config = None
     
     if page == "experiment":
-        engine = get_plugin_engine()
         config = engine.get_plugin(st.session_state.get("current_model_id"))
         if config:
             meta = config.metadata

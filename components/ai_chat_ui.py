@@ -73,7 +73,7 @@ def render_ai_chat_tab(config: PluginConfig) -> None:
     # Render actual conversation history (user questions + AI responses)
     # ----------------------------------------------------------------
     history = st.session_state.get("chat_history", [])
-    for msg in history:
+    for msg in reversed(history):
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 

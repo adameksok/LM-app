@@ -104,6 +104,13 @@ def render_results_panel(config: PluginConfig, model, X, y, params, feature_name
     for viz in main_vizs:
         _render_viz(viz, model, X, y, task, feature_names)
 
+    # --- TEMP: SANDBOX MESSAGE (LOREM IPSUM) ---
+    # st.markdown("""
+    # <div style="background: #FFF9E6; border-left: 5px solid #FFC107; padding: 16px; border-radius: 8px; color: #5D4037; font-size: 14px; margin: 15px 0; border: 1px solid #FFE082;">
+    #     <strong>💡 Insight:</strong> Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+    # </div>
+    # """, unsafe_allow_html=True)
+
     # --- DATAFRAME PREVIEW / TABLE (ALWAYS RENDER IF IN MAIN) ---
     # In case data_table was specified as main, but handled with others
     # Ensure it's not missed if it's the only one.
