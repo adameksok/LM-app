@@ -228,45 +228,6 @@ div.stButton > button:active {
     transform: translateY(0px) !important;
 }
 
-/* ── Login Section ── */
-.login-container {
-    max-width: 400px;
-    margin: 100px auto;
-    padding: 40px;
-    background: white;
-    border-radius: 16px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.05);
-    border: 1px solid #E8ECF0;
-}
-.login-header {
-    text-align: center;
-    margin-bottom: 30px;
-}
-.login-header h1 {
-    font-size: 24px;
-    font-weight: 800;
-    color: #1A1A2E;
-    margin: 0;
-}
-.login-header p {
-    font-size: 14px;
-    color: #666;
-    margin-top: 8px;
-}
-
-/* ── Generic Header Bar ── */
-.eq-header-bar { 
-    background:#004b87; color:white; padding:8px 16px; border-radius:8px 8px 0 0; 
-    font-size:11px; font-weight:700; letter-spacing:1.2px; text-align:left; 
-    display:flex; align-items:center; gap:8px; margin-bottom: 0px; 
-}
-.eq-footer-row { 
-    display:flex; justify-content:space-between; color:#64748b; 
-    font-size:10px; font-family:monospace; text-transform:uppercase; 
-    letter-spacing:0.5px; margin-top: 10px; border-top: 1px solid #f1f5f9; padding-top: 8px;
-}
-/* Ensure KaTeX inside the widget is properly sized */
-.katex { font-size: 1.4em !important; }
 
 /* Hide expander arrow globally */
 [data-testid="stExpander"] svg {
@@ -1079,40 +1040,210 @@ def _render_data_card(meta):
         if np.any(is_outlier):
             raw_df["_IsOutlier"] = is_outlier
 
-        # Removed redundant preview table from left column
-
     return raw_df, source_type
 
-# ── Authentication View ──
 def render_login_view():
-    st.markdown("""
-        <div class="login-container" style="text-align: center;">
-            <div class="login-header">
-                <img src="app/static/logoSV.png" width="80" style="margin-bottom: 20px;">
-                <h1>ScikitVision</h1>
-                <p>Please sign in to access the platform</p>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    # Correct password hash for '&)30project'
-    # Generated via: hashlib.sha256('&)30project'.encode()).hexdigest()
+    import base64
+    from pathlib import Path as _Path
+
+    def get_base64_image(image_path):
+        try:
+            with open(image_path, "rb") as image_file:
+                return base64.b64encode(image_file.read()).decode()
+        except:
+            return ""
+
+    _base = _Path(__file__).parent
+    logo_b64 = get_base64_image(_base / "static" / "logoSV.png")
     TARGET_USER = "project"
     TARGET_HASH = "fc0d46c71149d9a9fe23780f5c5dde5789d04062d45aa0abb576bb1234979673"
 
-    with st.container():
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            user_input = st.text_input("Username", key="login_user", placeholder="Enter username")
-            pass_input = st.text_input("Password", type="password", key="login_pass", placeholder="Enter password")
+    st.markdown("""
+        <style>
+            [data-testid="stHeader"], [data-testid="stToolbar"] { display: none !important; }
+            .main .block-container { padding: 0 !important; max-width: 100% !important; }
+            .bg-mesh-gradient {
+                background-color: #f7f9fd;
+                background-image:
+                    radial-gradient(at 0% 0%, rgba(55, 118, 171, 0.05) 0px, transparent 50%),
+                    radial-gradient(at 100% 0%, rgba(142, 201, 255, 0.08) 0px, transparent 50%),
+                    radial-gradient(at 100% 100%, rgba(55, 118, 171, 0.05) 0px, transparent 50%);
+                min-height: 100vh;
+                width: 100%;
+                font-family: 'Inter', sans-serif;
+            }
+
+            /* ── Override global button styles for login page ── */
+            div.stButton > button {
+                height: 44px !important;
+                font-size: 14px !important;
+                font-weight: 600 !important;
+                border-radius: 10px !important;
+                color: white !important;
+                background-color: #145d91 !important;
+                border: none !important;
+                transition: background-color 0.2s ease !important;
+            }
+            div.stButton > button:hover {
+                background-color: #0f4a73 !important;
+                transform: none !important;
+                box-shadow: 0 4px 12px rgba(20, 93, 145, 0.3) !important;
+            }
+            div.stButton > button:active {
+                transform: none !important;
+            }
+            /* Secondary buttons (Google, GitHub) */
+            div[data-testid="stHorizontalBlock"] div.stButton > button {
+                background-color: #ffffff !important;
+                color: #41474f !important;
+                border: 1px solid #dde1e7 !important;
+            }
+            div[data-testid="stHorizontalBlock"] div.stButton > button:hover {
+                background-color: #f7f9fd !important;
+                box-shadow: none !important;
+            }
+
+            /* ── Input fields ── */
+            div[data-testid="stTextInput"] input {
+                border: 1.5px solid #dde1e7 !important;
+                border-radius: 10px !important;
+                padding: 10px 14px !important;
+                font-size: 14px !important;
+                background: #ffffff !important;
+                color: #191c1f !important;
+                transition: border-color 0.2s !important;
+            }
+            div[data-testid="stTextInput"] input:focus {
+                border-color: #145d91 !important;
+                box-shadow: 0 0 0 3px rgba(20, 93, 145, 0.1) !important;
+            }
+            div[data-testid="stTextInput"] input::placeholder {
+                color: #adb5bd !important;
+            }
+        </style>
+        <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@700;800&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+    """, unsafe_allow_html=True)
+
+    # Wrap the entire view in a div
+    st.markdown(f"""
+    <div class="bg-mesh-gradient">
+        <!-- Header -->
+        <div style="width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 24px 60px; max-width: 1440px; margin: 0 auto;">
+            <div style="display: flex; align-items: center; gap: 10px; font-family: 'Manrope', sans-serif; font-weight: 800; font-size: 22px; color: #145d91;">
+                <img src="data:image/png;base64,{logo_b64}" style="height: 36px;">
+                ScikitVision
+            </div>
+            <div style="display: flex; gap: 32px; align-items: center;">
+                <span style="font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 13px; color: #41474f;">Research</span>
+                <span style="font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 13px; color: #41474f;">Datasets</span>
+                <span style="font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 13px; color: #41474f;">Models</span>
+                <span style="font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 13px; color: #41474f;">Tutorials</span>
+                <button style="background: #eef2f6; color: #145d91; border: none; padding: 8px 20px; border-radius: 10px; font-weight: 700; font-size: 13px;">Sign In</button>
+            </div>
+        </div>
+
+        <!-- Lateral Split Content -->
+        <div style="max-width: 1440px; margin: 0 auto; padding: 80px 60px; display: grid; grid-template-columns: 1.2fr 1fr; gap: 60px; align-items: center;">
             
-            if st.button("SIGN IN", use_container_width=True):
-                input_hash = hashlib.sha256(pass_input.encode()).hexdigest()
-                if user_input == TARGET_USER and input_hash == TARGET_HASH:
+            <!-- Left: Hero -->
+            <div style="position: relative;">
+                <div style="position: absolute; left: -20px; top: -40px; opacity: 0.1; pointer-events: none;">
+                    <span class="material-symbols-outlined" style="font-size: 120px; color: #145d91;">account_tree</span>
+                </div>
+                <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(142, 201, 255, 0.4); padding: 6px 16px; border-radius: 30px; margin-bottom: 32px;">
+                    <span class="material-symbols-outlined" style="font-size: 16px; color: #145d91;">school</span>
+                    <span style="font-size: 11px; font-weight: 700; color: #145d91; text-transform: uppercase;">Machine Learning Education</span>
+                </div>
+                <h1 style="font-family: 'Manrope', sans-serif; font-size: 72px; font-weight: 800; color: #191c1f; line-height: 1.05; margin: 0 0 32px 0;">
+                    Explore the power of <br>
+                    <span style="background: linear-gradient(135deg, #145d91 0%, #3776ab 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Scikit-learn</span>
+                </h1>
+                <p style="font-size: 17px; color: #41474f; line-height: 1.6; max-width: 500px; margin-bottom: 48px;">
+                    A sophisticated Streamlit-powered environment for visualizing, analyzing, and mastering machine learning models. Turn complex documentation into interactive discovery.
+                </p>
+                <div style="display: flex; gap: 20px;">
+                    <div style="background: white; padding: 14px 20px; border-radius: 14px; display: flex; align-items: center; gap: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+                        <span class="material-symbols-outlined" style="color: #145d91;">data_exploration</span>
+                        <div>
+                            <div style="font-size: 9px; font-weight: 700; color: #717880; text-transform: uppercase;">Interactivity</div>
+                            <div style="font-size: 13px; font-weight: 600;">Real-time Visuals</div>
+                        </div>
+                    </div>
+                    <div style="background: white; padding: 14px 20px; border-radius: 14px; display: flex; align-items: center; gap: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+                        <span class="material-symbols-outlined" style="color: #145d91;">psychology</span>
+                        <div>
+                            <div style="font-size: 9px; font-weight: 700; color: #717880; text-transform: uppercase;">Algorithm</div>
+                            <div style="font-size: 13px; font-weight: 600;">Intuitive Learning</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Login Card Visual -->
+            <div style="display: flex; justify-content: flex-end;">
+                <div style="width: 100%; max-width: 440px; background: white; border-radius: 24px; padding: 56px; box-shadow: 0 32px 64px -12px rgba(25, 28, 31, 0.08); border: 1px solid rgba(0,0,0,0.04); min-height: 520px; display: flex; flex-direction: column;">
+                    <div style="text-align: center; margin-bottom: 40px;">
+                        <h2 style="font-family: 'Manrope', sans-serif; font-size: 24px; font-weight: 700; color: #191c1f;">Welcome Back</h2>
+                        <p style="font-size: 13px; color: #717880; margin-top: 8px;">Access your research suite and logs</p>
+                    </div>
+                    <div id="login_card_content" style="flex-grow: 1;">
+                        <!-- Widgets will hover here -->
+                    </div>
+                    <div style="text-align: center; margin-top: 40px; font-size: 13px; color: #717880;">
+                        New researcher? <span style="color: #145d91; font-weight: 700; cursor: pointer;">Register</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="width: 100%; max-width: 1440px; margin: 0 auto; padding: 40px 60px; border-top: 1px solid rgba(193, 199, 208, 0.2); display: flex; justify-content: space-between; color: #717880; font-size: 11px;">
+            <div>© 2024 ScikitVision. Digital Curator Design System.</div>
+            <div style="display: flex; gap: 32px;">
+                <span>Privacy Policy</span>
+                <span>Terms of Service</span>
+                <span>Citation Guide</span>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Widgets overlaid on the right card via column positioning
+    # Ratios mirror the HTML grid (1.2fr hero + 1fr card) with small right margin
+    with st.container():
+        _, form_col, _ = st.columns([1.35, 0.9, 0.15])
+        with form_col:
+            # Push down past: navbar (~90px) + grid top-padding (80px) + card padding (56px) + "Welcome Back" header (~95px)
+            st.markdown("<br>" * 16, unsafe_allow_html=True)
+
+            st.markdown("<div style='font-size: 11px; font-weight: 700; color: #41474f; margin-bottom: 6px; letter-spacing: 0.5px; text-transform: uppercase;'>Username</div>", unsafe_allow_html=True)
+            u = st.text_input("U", key="login_u", label_visibility="collapsed", placeholder="e.g. student_01")
+
+            st.markdown("<div style='font-size: 11px; font-weight: 700; color: #41474f; margin-bottom: 6px; margin-top: 16px; letter-spacing: 0.5px; text-transform: uppercase;'>Password</div>", unsafe_allow_html=True)
+            p = st.text_input("P", key="login_p", type="password", label_visibility="collapsed", placeholder="••••••••••")
+
+            st.markdown("<div style='text-align: right; margin-top: 6px; margin-bottom: 20px;'><span style='font-size: 12px; color: #145d91; font-weight: 600; cursor: pointer;'>Forgot Password?</span></div>", unsafe_allow_html=True)
+
+            if st.button("Sign In", key="login_btn", use_container_width=True, type="primary"):
+                if u == TARGET_USER and hashlib.sha256(p.encode()).hexdigest() == TARGET_HASH:
                     st.session_state.authenticated = True
                     st.rerun()
                 else:
-                    st.error("Invalid credentials. Please try again.")
+                    st.error("Invalid credentials")
+
+            st.markdown("""
+                <div style="position: relative; margin: 24px 0 20px 0; text-align: center;">
+                    <hr style="border: 0; border-top: 1px solid #eef0f3; margin: 0;">
+                    <span style="position: absolute; top: -9px; left: 50%; transform: translateX(-50%); background: white; padding: 0 12px; font-size: 10px; color: #9ba3ad; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap;">Or continue with</span>
+                </div>
+            """, unsafe_allow_html=True)
+
+            soc1, soc2 = st.columns(2)
+            with soc1:
+                st.button("Google", key="g", use_container_width=True, icon=":material/ads_click:")
+            with soc2:
+                st.button("GitHub", key="gh", use_container_width=True, icon=":material/terminal:")
 
 def main():
     init_session_state()
